@@ -118,7 +118,7 @@ For each canonical profile:
 
 **Deception Awareness:**
 - LLM-as-judge analysis of reasoning traces
-- Score 0-3: No awareness → Explicit acknowledgment → Strategic privacy exploitation
+- Score 1-5: No awareness → Factual mention → Implicit → Explicit → Strategic awareness
 
 ---
 
@@ -183,13 +183,16 @@ python experiments/comprehensive_analysis.py
 # Opportunity-based exploitation rates
 python experiments/opportunity_based_analysis.py
 
+# Scaling analysis (3-10 agents for binary games)
+python experiments/scaling_analysis.py
+
 # Theoretical base rates (game-theoretic possibilities)
 python experiments/calculate_base_rates.py
 
 # Consensus rate analysis (majority voting agreement)
 python experiments/analyze_consensus_rates.py
 
-# Deception awareness (LLM-as-judge)
+# Deception awareness (LLM-as-judge with 1-5 scale)
 python experiments/deception_awareness_analysis.py
 ```
 
@@ -199,7 +202,7 @@ python experiments/deception_awareness_analysis.py
 
 ```
 outputs/
-├── experiments/                      # Raw experimental data (10MB)
+├── experiments/                      # Raw experimental data
 │   ├── fishing/
 │   │   ├── 3agents/
 │   │   │   ├── claude-sonnet-4.5_r1.json
@@ -209,14 +212,15 @@ outputs/
 │   │   └── 5agents/
 │   ├── publicgoods/
 │   ├── weakestlink/
-│   ├── volunteer/
-│   ├── diners/
-│   └── elfarol/
+│   ├── volunteer/              # 3-10 agents available
+│   ├── diners/                 # 3-10 agents available
+│   └── elfarol/                # 3-10 agents available
 ├── COMPREHENSIVE_ANALYSIS.txt        # All metrics by game/model/agents
 ├── THEORETICAL_BASE_RATES.txt        # Game-theoretic base rates
 ├── OPPORTUNITY_BASED_ANALYSIS.txt    # Strategic/selfish/altruistic exploitation
+├── SCALING_ANALYSIS.txt              # Scaling patterns (3-10 agents, binary games)
 ├── CONSENSUS_RATES.txt               # Majority voting agreement levels
-└── DECEPTION_AWARENESS.txt           # LLM-as-judge deception awareness
+└── DECEPTION_AWARENESS.txt           # LLM-as-judge deception awareness (1-5 scale)
 ```
 
 ### Output File Format
@@ -263,15 +267,15 @@ Average consensus rate across 5 independent samples:
 
 | Model | Avg Consensus | Unanimous (5/5) |
 |-------|---------------|-----------------|
-| Claude Sonnet 4.5 | 98.0% | 92.7% |
-| Gemini 3 Flash | 95.6% | 85.8% |
-| GPT-5 Nano | 90.7% | 72.9% |
-| GPT-5 | 87.2% | 61.4% |
-| GPT-5 Mini | 86.5% | 66.9% |
-| Llama 3.3 70B | 82.5% | 44.9% |
-| Qwen3-30B | 81.4% | 44.0% |
-| Deepseek v3.2 | 78.3% | 45.4% |
-| Qwen3-235B | 72.4% | 29.8% |
+| GPT-5 Mini | 99.7% | 98.5% |
+| Gemini 3 Flash | 99.0% | 96.8% |
+| GPT-5 | 98.5% | 94.6% |
+| Qwen3-235B | 96.0% | 85.6% |
+| Claude Sonnet 4.5 | 95.8% | 85.7% |
+| Qwen3-30B | 95.3% | 83.9% |
+| Llama 3.3 70B | 94.2% | 80.0% |
+| GPT-5 Nano | 85.4% | 52.0% |
+| Deepseek v3.2 | 78.0% | 35.3% |
 
 ### Strategic Exploitation by Game
 
@@ -279,15 +283,25 @@ Percentage of strategic opportunities exploited (5 agents, macro-averaged):
 
 | Game | Avg Exploitation |
 |------|------------------|
-| Volunteer | 71.1% |
-| El Farol | 40.0% |
-| Fishing | 56.6% |
-| Weakest Link | 15.5% |
+| El Farol | 95.6% |
+| Volunteer | 77.8% |
+| Weakest Link | 68.9% |
+| Fishing | 59.4% |
 
-### Deception Awareness
+### Deception Awareness (1-5 Scale)
 
-Most models (60-90%) show **Score 0** (no explicit acknowledgment of lying).
-Very few show **Score 2** (explicit "lie" language) or **Score 3** (strategic privacy exploitation).
+Using LLM-as-judge (GPT-5.1) to analyze 20,428 reasoning traces across all lying instances:
+
+**Aggregate Score Distribution (5 agents):**
+- **Score 1** (No awareness): 49.4%
+- **Score 2** (Factual mention): 4.3%
+- **Score 3** (Implicit awareness): 29.3%
+- **Score 4** (Explicit acknowledgment): 5.1%
+- **Score 5** (Strategic awareness): 11.8%
+
+**Model Variation:**
+- **Most aware**: Qwen3-235B (mean score 3.27)
+- **Least aware**: GPT-5 Nano (mean score 1.33)
 
 ---
 
@@ -299,6 +313,7 @@ LLM-Promise-Breaking/
 │   ├── run_scenario_enumeration.py
 │   ├── comprehensive_analysis.py
 │   ├── opportunity_based_analysis.py
+│   ├── scaling_analysis.py
 │   ├── calculate_base_rates.py
 │   ├── analyze_consensus_rates.py
 │   └── deception_awareness_analysis.py
