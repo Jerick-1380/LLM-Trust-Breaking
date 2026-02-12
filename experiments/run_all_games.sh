@@ -23,7 +23,7 @@ MODELS=(
 )
 
 # Number of agents to test (3, 4, or 5)
-NUM_AGENTS=10
+NUM_AGENTS=6
 
 # Execution mode
 USE_QUEUE=1  # Set to 1 for queue mode (recommended), 0 for batch mode

@@ -1200,8 +1200,17 @@ def process_queue_results(
         # Compute consensus stats
         consensus_stats = compute_consensus_stats(actions)
 
-        # Get reasoning from first response
-        reasoning = responses_list[0]['reasoning'] if responses_list else ""
+        # Store all sample details (action + reasoning pairs)
+        sample_details = [
+            {
+                'action': r['action'],
+                'reasoning': r.get('reasoning', '')
+            }
+            for r in responses_list
+        ]
+
+        # Get reasoning from first response (for backwards compatibility)
+        reasoning = responses_list[0].get('reasoning', '') if responses_list else ""
 
         # Determine if agent lied (with proper type normalization)
         # Single-agent scenarios use 'announced' key, multi-agent use agent_name key
@@ -1223,7 +1232,8 @@ def process_queue_results(
             'actual': actual_action,
             'lied': lied,
             'consensus_stats': consensus_stats,
-            'all_sample_responses': [r['action'] for r in responses_list]
+            'all_sample_responses': [r['action'] for r in responses_list],
+            'sample_details': sample_details
         }
 
         if reasoning and not reasoning.startswith("JSON parsing failed") and not reasoning.startswith("ERROR:"):
@@ -1243,6 +1253,89 @@ def process_queue_results(
         processed_results.append(scenario_data)
 
     return processed_results
+
+
+def build_scenario_prompt(game_type: str, agent_name: str, agent_names: List[str],
+                          announcements: Dict[str, Any], game_params: Dict[str, Any]):
+    """
+    Dispatcher function to route to the correct game-specific prompt builder.
+
+    Args:
+        game_type: Type of game
+        agent_name: Name of the agent being prompted
+        agent_names: List of all agent names
+        announcements: Announcement scenario data
+        game_params: Game-specific parameters
+
+    Returns:
+        Tuple of (system_prompt, user_prompt, json_schema)
+    """
+    n_agents = len(agent_names)
+
+    if game_type == "fishing" or game_type == "fishing_single_agent":
+        from src.scenario_enumeration.core.llm_scenario_tester import build_fishing_single_agent_prompt
+        return build_fishing_single_agent_prompt(
+            agent_name=agent_name,
+            announced=announcements.get('announced', announcements.get('agent_announced')),
+            others_total=announcements.get('others_total'),
+            collapse_threshold=game_params.get('collapse_threshold', n_agents * 3),
+            max_catch=game_params.get('max_catch_per_agent', 5),
+            game_params=game_params
+        )
+
+    elif game_type == "volunteer" or game_type == "volunteer_single_agent":
+        from src.scenario_enumeration.core.llm_scenario_tester import build_volunteer_single_agent_prompt
+        return build_volunteer_single_agent_prompt(
+            agent_name=agent_name,
+            announced=announcements.get('announced', announcements.get('agent_announced')),
+            others_volunteer_count=announcements.get('others_volunteer_count'),
+            n_other_agents=n_agents - 1,
+            game_params=game_params
+        )
+
+    elif game_type == "elfarol" or game_type == "elfarol_single_agent":
+        from src.scenario_enumeration.core.llm_scenario_tester import build_elfarol_single_agent_prompt
+        return build_elfarol_single_agent_prompt(
+            agent_name=agent_name,
+            announced=announcements.get('announced', announcements.get('agent_announced')),
+            others_go_count=announcements.get('others_go_count'),
+            n_other_agents=n_agents - 1,
+            game_params=game_params
+        )
+
+    elif game_type == "diners" or game_type == "diners_single_agent":
+        from src.scenario_enumeration.core.llm_scenario_tester import build_diners_single_agent_prompt
+        return build_diners_single_agent_prompt(
+            agent_name=agent_name,
+            announced=announcements.get('announced', announcements.get('agent_announced')),
+            others_expensive_count=announcements.get('others_expensive_count'),
+            n_other_agents=n_agents - 1,
+            game_params=game_params
+        )
+
+    elif game_type == "publicgoods" or game_type == "publicgoods_single_agent":
+        from src.scenario_enumeration.core.llm_scenario_tester import build_publicgoods_single_agent_prompt
+        return build_publicgoods_single_agent_prompt(
+            agent_name=agent_name,
+            announced=announcements.get('announced', announcements.get('agent_announced')),
+            others_total=announcements.get('others_total'),
+            initial_tokens=game_params.get('initial_tokens', 5),
+            multiplier=game_params.get('multiplier', 1.5),
+            game_params=game_params
+        )
+
+    elif game_type == "weakestlink" or game_type == "weakestlink_single_agent":
+        from src.scenario_enumeration.core.llm_scenario_tester import build_weakestlink_single_agent_prompt
+        return build_weakestlink_single_agent_prompt(
+            agent_name=agent_name,
+            announced=announcements.get('announced', announcements.get('agent_announced')),
+            others_minimum=announcements.get('others_minimum'),
+            max_effort=game_params.get('max_effort', 5),
+            game_params=game_params
+        )
+
+    else:
+        raise ValueError(f"Unknown game type for prompt building: {game_type}")
 
 
 def run_all_scenarios(
@@ -1611,8 +1704,17 @@ def _execute_batch(
         # Compute consensus stats
         consensus_stats = compute_consensus_stats(actions)
 
-        # Get reasoning from first response (or majority if available)
-        reasoning = responses_list[0]['reasoning'] if responses_list else ""
+        # Store all sample details (action + reasoning pairs)
+        sample_details = [
+            {
+                'action': r['action'],
+                'reasoning': r.get('reasoning', '')
+            }
+            for r in responses_list
+        ]
+
+        # Get reasoning from first response (for backwards compatibility)
+        reasoning = responses_list[0].get('reasoning', '') if responses_list else ""
 
         # Determine if agent lied (with proper type normalization)
         # Single-agent scenarios use 'announced' key, multi-agent use agent_name key
@@ -1656,7 +1758,8 @@ def _execute_batch(
             'actual': actual_action,
             'lied': lied,
             'consensus_stats': consensus_stats,
-            'all_sample_responses': [r['action'] for r in responses_list]  # Store all individual responses
+            'all_sample_responses': [r['action'] for r in responses_list],
+            'sample_details': sample_details
         }
 
         # Only include reasoning if it's meaningful (not empty and not an error message)

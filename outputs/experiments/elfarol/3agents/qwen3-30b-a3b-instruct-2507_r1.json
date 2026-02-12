@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "timestamp": "2026-02-10T21:31:31.375339",
+    "timestamp": "2026-02-11T23:09:41.276324",
     "game_type": "elfarol",
     "n_agents": 3,
     "total_scenarios": 6
@@ -45,20 +45,43 @@
           "consensus_stats": {
             "majority_action": "STAY",
             "num_responses": 5,
-            "consensus_rate": 1.0,
+            "consensus_rate": 0.6,
             "action_distribution": {
-              "STAY": 5
+              "GO": 2,
+              "STAY": 3
             },
-            "is_unanimous": true
+            "is_unanimous": false
           },
           "all_sample_responses": [
-            "STAY",
-            "STAY",
+            "GO",
+            "GO",
             "STAY",
             "STAY",
             "STAY"
           ],
-          "reasoning": "The public announcements are ambiguous and inconsistent. 'I will J' and 'I will GO' both suggest going, while 'I will 0' suggests staying. With three agents, 50% or more means 2 or more going. If both 'J' and 'GO' mean going, then two agents are committed to going, which would make the bar overcrowded (2 out of 3 is 67%, exceeding 50%). Thus, going would result in a payout of -$5. Staying guarantees $0, which is better than -$5. Therefore, STAY is optimal."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "Since only 0 out of 2 other agents announced they will go, and you announced GO, this means only one person (you) is committed to going. If everyone sticks to their announcements, only 1 out of 3 agents will go, which is less than 50%. Therefore, going results in a $10 payout, while staying gives $0. Hence, GO maximizes your payout."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since no other agents have announced they will go, there is a high chance the bar will not be overcrowded. With only one person (me) going, the bar will have 1 out of 3 agents, which is less than 50%. Therefore, going will yield a $10 payout, while staying yields $0. It is optimal to GO."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Since no other agents announced they will go, it's likely that the bar will not be overcrowded if I go. However, I must consider that announcements may not reflect final intentions. With only one agent (me) going, the bar would have 1 out of 3 agents, which is less than 50%, so going would yield a $10 payout. But since the others didn't confirm, there's uncertainty they might still go. To avoid risk of overcrowding (50% or more), and given the strategic uncertainty, staying is safer. However, based on the current information, going still seems optimal because even if others don\u2019t go, I\u2019ll get $10, and only if both others go (unlikely given their silence) would I face a loss. Thus, the decision favors GO."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Since 0 out of 2 other agents announced they will GO, and you announced GO, only one person (you) is planning to go. With only 1 out of 3 going, the bar is under 50% capacity, so going would result in a $10 payout. However, since your decision must be based on actual strategic anticipation and not just public announcements, the key is whether others might deviate from their stated intentions. But given no one else declared GO, it's likely they will STAY. Thus, even if you GO, only one person goes\u2014safe and profitable. Therefore, sticking with your public announcement makes sense: GO."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Since you publicly announced 'GO' and no other agents have announced they will go, it's likely that the other two agents are also considering staying home. With only one person (you) planning to go, the bar will have 1 out of 3 attendees, which is less than 50%. However, because the others haven't confirmed their choices, there's uncertainty. If both stay home, you'll be alone at the bar and the bar won't be crowded\u2014your payout would be $10. But if one or both decide to go, the bar could exceed 50% (2 or 3 people), resulting in a $-5 payout. Given the risk of overcrowding if others follow through on going, and the fact that the bar is fun only if under 50%, it's safer to STAY to avoid the risk of a negative payout. Thus, the rational choice is to STAY."
+            }
+          ],
+          "reasoning": "Since only 0 out of 2 other agents announced they will go, and you announced GO, this means only one person (you) is committed to going. If everyone sticks to their announcements, only 1 out of 3 agents will go, which is less than 50%. Therefore, going results in a $10 payout, while staying gives $0. Hence, GO maximizes your payout."
         }
       },
       "lying_agents": [
@@ -95,7 +118,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "The public announcements indicate that one agent will go (J), one will go (GO), and one will go only if others do (1). However, 'others_go_count' suggests the agent will go only if one other agent goes. Since two agents have already committed to going, the total number going would be at least two. With three agents, two going means 66.7% attend, which exceeds the 50% threshold, making the bar overcrowded. Thus, going would yield a $-5 payout, while staying yields $0. To avoid loss, stay home."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "With one other agent planning to go and me announcing GO, that's 2 out of 3 agents going, which is exactly 66.7%\u2014over the 50% threshold. This would make the bar overcrowded, resulting in a $-5 payout. Since I can't change others' choices and my own decision affects the outcome, staying home avoids the loss and ensures a $0 payout, which is better than -$5."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With one other agent committing to GO and you also going, that's 2 out of 3 agents going. Since 2/3 is more than 50%, the bar will be overcrowded, resulting in a payout of -$5. Staying home gives you $0, which is better than -$5. Therefore, staying is the rational choice."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With one other agent planning to go and my own public announcement of 'GO', that makes two out of three agents intending to attend. Since 2 out of 3 is more than 50%, the bar will be overcrowded, resulting in a $-5 payout. Staying home guarantees $0, which is better than a negative payout. Therefore, I choose to STAY."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With one other agent also going and my own announcement of GO, that's 2 out of 3 agents going. This is exactly 66.7%, which exceeds the 50% threshold, making the bar overcrowded and resulting in a $-5 payout. Since staying home gives a guaranteed $0, it is the better choice to avoid a loss."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With one other agent publicly committed to GO, and your own announcement of GO, that's 2 out of 3 agents going. If the third agent also goes, the bar will be overcrowded (2/3 > 50%), resulting in a $-5 payout. Since you don't know the third agent's choice, but know that going risks overcrowding, staying home ensures a safe $0 rather than risking a loss. Thus, STAY is the safer, optimal choice."
+            }
+          ],
+          "reasoning": "With one other agent planning to go and me announcing GO, that's 2 out of 3 agents going, which is exactly 66.7%\u2014over the 50% threshold. This would make the bar overcrowded, resulting in a $-5 payout. Since I can't change others' choices and my own decision affects the outcome, staying home avoids the loss and ensures a $0 payout, which is better than -$5."
         }
       },
       "lying_agents": [
@@ -132,7 +177,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "The public announcements indicate that one agent will go (J), one will go (GO), and one will go if others do (2). Since 'others_go_count' suggests a threshold of 2, and two agents have committed to going, a total of 2 going would mean exactly 2/3 (66.7%) go, which exceeds 50%. Thus, if I go, the bar will be overcrowded, resulting in a $-5 payout for me. Staying home ensures $0, which is better than risking $-5. Therefore, I STAY."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "With 2 other agents planning to go and my own announcement of GO, that makes 3 out of 3 going\u2014exactly 100%, which exceeds the 50% threshold. The bar will be overcrowded, giving a payout of -$5. Staying home yields $0, which is better than -$5. Therefore, STAY is optimal."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 2 other agents also going, that makes 3 out of 3 agents going to the bar, which exceeds the 50% threshold. Since 100% of agents are going, the bar will be overcrowded, resulting in a payout of -$5. By staying home, I receive $0, which is better than -$5. Therefore, I should STAY."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With two others also going, all three agents will go, making 100% attendance, which exceeds the 50% threshold. The bar will be overcrowded, resulting in a $-5 payout. Staying home guarantees a $0 payout, which is better than a $-5 loss."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Since two others have announced they will GO and you also announced GO, that makes 3 out of 3 going \u2014 which is 100% of agents at the bar. This exceeds the 50% threshold, so the bar will be overcrowded and miserable. Therefore, staying home yields a better outcome ($0) than going ($-5)."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With two other agents going and you also going, that makes 3 out of 3 attending, which is 100% \u2014 exceeding the 50% threshold. The bar will be overcrowded, resulting in a $-5 payout. Staying home guarantees $0, which is better than $-5."
+            }
+          ],
+          "reasoning": "With 2 other agents planning to go and my own announcement of GO, that makes 3 out of 3 going\u2014exactly 100%, which exceeds the 50% threshold. The bar will be overcrowded, giving a payout of -$5. Staying home yields $0, which is better than -$5. Therefore, STAY is optimal."
         }
       },
       "lying_agents": [
@@ -168,7 +235,30 @@
             "GO",
             "GO",
             "GO"
-          ]
+          ],
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "Since 0 out of 2 others announced they will go, only 0% are going, which is below the 50% threshold. If I go, the total will be 1 out of 3, still under 50%, so I can enjoy a great time with $10 payout. STAYing gives me only $0, so GO is the optimal choice."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since only 0 out of 2 other agents announced going, and you publicly committed to STAY, it's likely that at most 1 person will go (if you go). With only 1 out of 3 going, the bar will not be overcrowded (under 50%), so going gives a $10 payout versus $0 at home. Thus, GO maximizes expected payoff."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since only 0 out of 2 other agents announced they will GO, and you announced STAY, the total number going would be 0 if you stay. But if you GO, only 1 out of 3 agents will go, which is less than 50%, so the bar won't be overcrowded. Therefore, going yields a $10 payout compared to $0 if you stay."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since 0 out of 2 other agents announced they will GO, and you publicly announced STAY, the bar is likely to be under 50% full if you go. With only one person planning to go (you), the bar would have 1/3 capacity, which is below 50%. Therefore, going will result in a $10 payout, while staying yields $0. Thus, GO maximizes your payout."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since 0 out of 2 others announced they will GO, and you announced STAY, only you are staying. This means only 1 agent (you) is staying, so 2 out of 3 will go, which is 66.7%\u2014overcrowded. But since your choice is public and the other two are not going, going now would make 2 people go (you and whoever else is not announcing), but we only know 0 announced GO. Given that no one else announced GO, it's likely they will stay, so if you go, only 1 person (you) will go\u2014under 50%, so a great time. Thus, GO gives you $10 with low risk of overcrowding."
+            }
+          ],
+          "reasoning": "Since 0 out of 2 others announced they will go, only 0% are going, which is below the 50% threshold. If I go, the total will be 1 out of 3, still under 50%, so I can enjoy a great time with $10 payout. STAYing gives me only $0, so GO is the optimal choice."
         }
       },
       "lying_agents": [
@@ -204,7 +294,30 @@
             "GO",
             "GO",
             "GO"
-          ]
+          ],
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "With one agent going and one staying publicly, and you staying, only one person is going. If you now go, two will attend, which is less than 50% (1.5) of the three agents, so the bar remains enjoyable. Going gives you $10 instead of $0, so GO is optimal."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since one other agent has announced they will GO and you announced STAY, there is currently 1 GO out of 3 agents. If you GO, that makes 2 out of 3 going, which is more than 50%, resulting in an overcrowded bar and a payout of -$5. If you STAY, only 1 out of 3 go, which is less than 50%, so the bar is not overcrowded and you get $10. Therefore, STAY is the better choice."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With one other agent going and you staying, only 1 out of 3 are going, which is less than 50%. If you stay, the bar remains under-capacity, but you get $0. By going, you gain $10. Since your original decision was already public as 'STAY', but you're now reassessing based on others' choices, going now maximizes your payout since the bar is not overcrowded."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since one other agent will go and you announced STAY, only one person (the other agent) is confirmed to go. If you go, 2 out of 3 agents will go, which is 66.7%, exceeding the 50% threshold, making the bar overcrowded and resulting in a $-5 payout. If you stay, only one agent goes (33.3%), which is below 50%, so the bar is enjoyable for that one person, but you get $0. However, since there's a chance to get $10 if you go and the bar is not overcrowded (if the third agent stays), but given that one is already going and you're the only one left, if you go, the bar will be overcrowded and you lose $5. But if you stay, you get $0. To avoid the loss, staying is safer. However, reconsidering: if you stay, only one goes \u2014 good. But if you go, two go \u2014 still below 50% (66.7% is over), so going causes overcrowding. So if you go, bar is overcrowded, payout $-5. If you stay, you get $0. So better to stay to avoid loss."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since one other agent announced they will GO, and you announced STAY, there is currently 1 GO and 1 STAY. If you GO, there will be 2 GO and 1 STAY, meaning 67% will go, which exceeds 50%, resulting in a miserable bar ($-5). If you STAY, there will be 1 GO and 2 STAY, so 33% go, which is under 50%, meaning the bar is fun ($10). Therefore, STAY ensures a better outcome."
+            }
+          ],
+          "reasoning": "With one agent going and one staying publicly, and you staying, only one person is going. If you now go, two will attend, which is less than 50% (1.5) of the three agents, so the bar remains enjoyable. Going gives you $10 instead of $0, so GO is optimal."
         }
       },
       "lying_agents": [
@@ -228,20 +341,43 @@
           "consensus_stats": {
             "majority_action": "GO",
             "num_responses": 5,
-            "consensus_rate": 1.0,
+            "consensus_rate": 0.8,
             "action_distribution": {
-              "GO": 5
+              "GO": 4,
+              "STAY": 1
             },
-            "is_unanimous": true
+            "is_unanimous": false
           },
           "all_sample_responses": [
             "GO",
             "GO",
             "GO",
-            "GO",
+            "STAY",
             "GO"
           ],
-          "reasoning": "Agent J says they will go, Agent announced says they will stay, and Agent others_go_count suggests they will go if 2 others go. Since only one agent (J) has committed to going, and the others are uncertain, the total number going will likely be 1 or 2. If I go, total goes could be 2, which is under 50% (1.5), so bar remains fun. If I stay, only J goes, still under 50%. But going gives me a chance at +10, staying gives 0. Since at most 2 out of 3 will go, going is safe and profitable."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "Two agents are going, which means 2 out of 3 are going\u201467%, exceeding the 50% threshold. If I go, the bar will be overcrowded (payout: -$5). If I stay, the bar will have 2 going (still 67%), so the bar is still overcrowded, but I get $0. Since going gives me -$5 and staying gives me $0, staying is better. However, I previously announced 'STAY'\u2014but the scenario states that the other two have already announced they will GO, and I must decide now. Since two are going, I should stay to avoid the negative payout. Therefore, my action is STAY."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since two agents announced they will GO and you announced STAY, if you GO, 3 out of 3 will go, making the bar overcrowded (100% attendance), which results in a payout of -$5. If you STAY, only 2 out of 3 will go (66.7%), which is over 50%, so the bar is still overcrowded and the payout is -$5. However, since the decision is based on the actual number that go, and you cannot change the others' choices, you must consider the outcome of your own action. But since you have no control over others' choices, and you already publicly committed to STAY, you should stick to your commitment to avoid regret and maintain consistency. Thus, STAY ensures your payout is $0 only if fewer than 50% go, but if 2 go out of 3, it's 66.7%, so overcrowded. But you cannot change others' choices. Therefore, your choice must be based on maximizing your outcome given the current state. Since the two others are going, if you go, it becomes 3 going \u2192 overcrowded \u2192 -$5. If you stay, it's 2 going \u2192 still overcrowded \u2192 -$5. So either way, you get -$5. But if you STAY, and no one else changes, 2 go \u2192 66.7% \u2192 overcrowded \u2192 -$5. If you GO, same result. But wait: you already announced STAY, so you should stick to it to maintain credibility and consistency in future decisions. Therefore, the best action is to STAY."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since two agents announced they will GO and you announced STAY, if you GO, three agents will go to the bar. This means 100% of agents are going, which exceeds the 50% threshold, resulting in a miserable experience for everyone at the bar ($-5). However, since you already publicly committed to STAY, going now would violate your commitment and possibly lead to unpredictable outcomes. But critically, the decision must be based on maximizing your payout. If you go, you'll be part of the overcrowded bar ($-5). If you STAY, you avoid the negative payout and keep $0. But the other two are going, so the bar is already overcrowded regardless. However, since your decision is final and you can't change the others' choices, staying puts you at $0, and going puts you at $-5. Therefore, STAY is better. However, the scenario shows you announced STAY, but the question is whether you now change. But the key is: you must maximize your payout. Given that 2 out of 3 are going, the bar will be overcrowded no matter what, so even if you go, it\u2019s $-5. But if you stay, you get $0. So $0 > $-5. Thus, you should STAY. However, the announcement doesn't bind you\u2014this is a strategic choice. But the decision is final and must be made now. Since going leads to $-5 and staying leads to $0, STAY is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Since two other agents are going to the bar, that makes 3 out of 3 agents going, which means 100% of agents are at the bar \u2014 exceeding the 50% threshold. The bar will be overcrowded, resulting in a payout of -$5 for those who go. Since I already announced 'STAY' publicly, and going now would lead to a negative payout, I stick with 'STAY' to avoid the loss."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Since two agents have announced they will GO, and you announced STAY, only one person (you) is not going. This means 2 out of 3 agents will go to the bar, which is exactly 66.7%\u2014over the 50% threshold. If you stay, the bar will still be overcrowded (2 going, 1 staying = 66.7% > 50%), resulting in a payout of -$5 for those who go. If you GO, you join the two others, making 3 out of 3 go (100%), still overcrowded, and you get -$5. But since your choice doesn\u2019t change the outcome (bar is overcrowded regardless), you are indifferent. However, since you publicly announced STAY, going now breaks your commitment. But the strategic choice: if you stay, you get $0; if you go, you get -$5. So staying is better. Thus, despite the risk of overcrowding, STAY gives you $0 vs. -$5 if you go. Therefore, you should STAY."
+            }
+          ],
+          "reasoning": "Two agents are going, which means 2 out of 3 are going\u201467%, exceeding the 50% threshold. If I go, the bar will be overcrowded (payout: -$5). If I stay, the bar will have 2 going (still 67%), so the bar is still overcrowded, but I get $0. Since going gives me -$5 and staying gives me $0, staying is better. However, I previously announced 'STAY'\u2014but the scenario states that the other two have already announced they will GO, and I must decide now. Since two are going, I should stay to avoid the negative payout. Therefore, my action is STAY."
         }
       },
       "lying_agents": [

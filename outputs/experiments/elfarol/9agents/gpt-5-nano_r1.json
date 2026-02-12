@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "timestamp": "2026-02-10T23:22:17.547788",
+    "timestamp": "2026-02-12T00:16:10.040852",
     "game_type": "elfarol",
     "n_agents": 9,
     "total_scenarios": 18
@@ -46,21 +46,42 @@
           "consensus_stats": {
             "majority_action": "GO",
             "num_responses": 5,
-            "consensus_rate": 0.8,
+            "consensus_rate": 1.0,
             "action_distribution": {
-              "GO": 4,
-              "STAY": 1
+              "GO": 5
             },
-            "is_unanimous": false
+            "is_unanimous": true
           },
           "all_sample_responses": [
             "GO",
             "GO",
             "GO",
             "GO",
-            "STAY"
+            "GO"
           ],
-          "reasoning": "Announcements imply very few others will go (one explicit GO; others report 0). If I also go, total goes < 5, yielding +10. Staying yields 0 regardless, so going maximizes expected payout."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "Only me would go (1 of 9), which is under 50% crowd, yielding +10 payoff; staying would yield 0."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 0 of 8 others going, only 1 person would attend, which is below 50%, yielding +10; staying yields 0."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With only you going (1/9 \u224811%), the bar is not crowded and everyone at the bar gets $10. Staying yields $0."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With only 1 attendee (you plus 0 others) the bar is under 50% crowded, yielding $10. Staying would yield $0, so GO maximizes payoff."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 0 of 8 others going, only you would go, which is fewer than 50% of 9. That yields a $10 payoff for those at the bar, so GO maximizes expected payout."
+            }
+          ],
+          "reasoning": "Only me would go (1 of 9), which is under 50% crowd, yielding +10 payoff; staying would yield 0."
         }
       },
       "lying_agents": [],
@@ -95,7 +116,29 @@
             "GO",
             "GO"
           ],
-          "reasoning": "Public announcements imply exactly 1 other person will go (others_go_count = 1) and at least one person will go. If I also go, total goers = 2 (<50%), yielding +10 for those at the bar. Sticking would yield 0, so GO maximizes expected payout."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "With you already going and only 1 of 8 others going, total attendees would be 2, which is below 50% of 9 (4.5). The bar would be undercrowded, giving you +10 payoff, better than staying home (0)."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With you and 1 of 8 others going, only 2 out of 9 attend (<50%). That yields a great time (+10) for attendees, so GO maximizes expected payout for you."
+            },
+            {
+              "action": "GO",
+              "reasoning": "I already announced GO; with at least 2 going (me + 1 other), total is below 50% and yields +10 for those at the bar. Staying would give 0 regardless."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 2 of 9 going (including my public GO), fewer than 50% go, so payout +10 for those at bar; staying yields 0. GO maximizes payoff given the announced choices."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Total going would be 2 out of 9 (<50%), so those at the bar get +10. Staying would yield 0, so GO maximizes expected payout given 1 other GOed."
+            }
+          ],
+          "reasoning": "With you already going and only 1 of 8 others going, total attendees would be 2, which is below 50% of 9 (4.5). The bar would be undercrowded, giving you +10 payoff, better than staying home (0)."
         }
       },
       "lying_agents": [],
@@ -117,21 +160,42 @@
           "consensus_stats": {
             "majority_action": "GO",
             "num_responses": 5,
-            "consensus_rate": 0.6,
+            "consensus_rate": 1.0,
             "action_distribution": {
-              "GO": 3,
-              "STAY": 2
+              "GO": 5
             },
-            "is_unanimous": false
+            "is_unanimous": true
           },
           "all_sample_responses": [
             "GO",
             "GO",
             "GO",
-            "STAY",
-            "STAY"
+            "GO",
+            "GO"
           ],
-          "reasoning": "Based on announcements, at least 3 others are going (the GO speaker plus two others). If I also go, total going is 4 out of 9, which is below 50%, giving everyone at the bar a +10 payoff. Therefore going maximizes my expected payout."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "Total going would be 3 (<50% of 9), so the bar is not overcrowded and those who go get +10. Staying yields 0, so GO gives higher expected payout."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With you and 2 others going, total 3/9 < 50%, the bar is not crowded and you gain +10 by going vs 0 staying."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With you+2 others going (3/9 \u2248 33%), the bar won't be crowded, so you get +10. Staying would give 0, so GO maximizes payout given the revealed choices."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Total going would be 3 of 9 (<50%), so payout would be 10 for those at the bar; STAY yields 0. Since I already publicly announced GO, GO remains optimal."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 2 of 8 others going, total going = 3/9 = 33% < 50%, so going yields +10 while staying yields 0; GO maximizes expected payoff."
+            }
+          ],
+          "reasoning": "Total going would be 3 (<50% of 9), so the bar is not overcrowded and those who go get +10. Staying yields 0, so GO gives higher expected payout."
         }
       },
       "lying_agents": [],
@@ -166,7 +230,29 @@
             "GO",
             "GO"
           ],
-          "reasoning": "Three others will go. If I also go, total going = 4, which is less than 50% of 9, yielding +10. Staying would yield 0, so GO maximizes my payout."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "Total going would be 4 out of 9 (~44%), which is under 50%, yielding +10 payout. Staying yields 0, so GO maximizes expected payoff."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Total goers would be 4 (you + 3 others) which is <50% of 9, so at-bar payout is $10 vs $0 if you stay. GO yields higher expected payout."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With you and 3 others going, 4 of 9 attend (<50%), the bar isn\u2019t overcrowded and you get $10; STAY would yield $0."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Total going = you + 3 others = 4 out of 9 (<50%), so the bar is not overcrowded and you get +10 by going."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With you and 3 others going, total going is 4 out of 9 (\u224844%), which is under 50% and yields $10 for those at the bar; staying would yield $0."
+            }
+          ],
+          "reasoning": "Total going would be 4 out of 9 (~44%), which is under 50%, yielding +10 payout. Staying yields 0, so GO maximizes expected payoff."
         }
       },
       "lying_agents": [],
@@ -201,7 +287,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "Public announcements imply 5 people will go to the bar (one 'GO' plus 4 others), causing overcrowding and a -5 payoff for those going. Staying yields 0 and avoids the negative payout."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "With you and 4 others going, 5/9 go (over 50%), making the bar overcrowded and payouts at the bar -5. Staying yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With you and 4 others going, 5/9 go (over 50%), leading to a -5 payout for those who go. Staying yields 0, which is better than -5."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Total going would be 5 of 9, which is over half, causing overcrowding and a -5 payoff for going; staying yields 0, so STAY."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go, total going would be 5 out of 9, which is over 50%, giving me -5. By staying, I earn 0 and avoid the overcrowding penalty."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With you going already and 4 of 8 others going, 5 of 9 would go (over 50%), causing overcrowding and a -5 payout if you go. Staying yields 0 and avoids the negative outcome."
+            }
+          ],
+          "reasoning": "With you and 4 others going, 5/9 go (over 50%), making the bar overcrowded and payouts at the bar -5. Staying yields 0, which is better."
         }
       },
       "lying_agents": [
@@ -238,7 +346,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "Others going count is 5. If I go, total going = 6 (over 50%), yielding -5. If I stay, I get 0. So STAY is better."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "Going would push total attendees to 6 of 9 (\u226550%), causing overcrowding and a -$5 payout for goers. Staying yields $0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 5 of 8 others going, if you also go the bar would be overcrowded (6/9 \u2248 67%), giving -5. Staying yields 0 and avoids the negative payoff."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 5 others going, if I go too, total going = 6 (overcrowded) and I\u2019d incur -5. Staying yields 0, which is strictly better than -5 for going. The best response is to stay."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Staying yields $0, while going would be overcrowded since 5 of 9 would go (\u226550%), resulting in -$5 for those at the bar. Therefore, STAY maximizes my payout."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Staying yields 0 payoff, while going would result in overcrowding (-$5). With 5 others going, the bar would be overcrowded either way, so staying avoids a negative outcome."
+            }
+          ],
+          "reasoning": "Going would push total attendees to 6 of 9 (\u226550%), causing overcrowding and a -$5 payout for goers. Staying yields $0, which is better."
         }
       },
       "lying_agents": [
@@ -275,7 +405,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "6 others plan to go, so going would result in overcrowding (>50%), giving -$5 to those who go. Staying yields $0, which is better."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "Given 6 of the other 8 will go, if I go the bar will be overcrowded (7/9) and I\u2019d get -5. Staying home yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Staying yields 0 payout, while going would result in overcrowding (7 going total) and a -5 payout."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "7 out of 9 would be at the bar if you go, causing overcrowding and a -5 payoff; staying yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Staying yields 0, while going would make 7 of 9 attend (overcrowded), resulting in -5."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go, total going = 7/9, overcrowded, payout -5. If I stay, payout 0. So STAY minimizes risk and avoids negative payoff."
+            }
+          ],
+          "reasoning": "Given 6 of the other 8 will go, if I go the bar will be overcrowded (7/9) and I\u2019d get -5. Staying home yields 0, which is better."
         }
       },
       "lying_agents": [
@@ -312,7 +464,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "7 others will go, causing overcrowding regardless of my action. Staying yields 0 while going would yield -5 as I\u2019d be at the overcrowded bar."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "Even with 7 of 8 others going, the bar would be overcrowded no matter what I do (7 or 8 attendees). Staying yields 0, going yields -5, so STAY maximizes my payout."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 7 of the 8 others going, if I also go it will be 8/9 at the bar (overcrowded) for a payout of -5. Staying yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 8 of 9 going (including my prior GO), going would yield -5 due to overcrowding. Staying yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 7 of the 8 others going, the bar would be overcrowded even without me going; if I go I\u2019d get -5, but staying yields 0, the better payoff."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 7 others going, if I also go the bar would be overcrowded (8/9), yielding -5. Staying yields 0, which is better than -5."
+            }
+          ],
+          "reasoning": "Even with 7 of 8 others going, the bar would be overcrowded no matter what I do (7 or 8 attendees). Staying yields 0, going yields -5, so STAY maximizes my payout."
         }
       },
       "lying_agents": [
@@ -349,7 +523,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "Public info suggests 8 others will go, making the bar overcrowded if I go; staying yields 0, which is better than -5."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "With 9 attendees, the bar is overcrowded (-5 payout). Staying home yields 0, which is better than participating in the overcrowded outcome."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go, 9/9 attendees = overcrowded, payout -5. Staying yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go, 9 attendees would be at the bar (overcrowded), giving -5 payout. Staying yields 0, which is higher."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go, all 9 go and the bar is overcrowded (-$5). Staying yields $0, which is better than -$5."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go and everyone else goes, 9 attendees -> overcrowded (-5 payout to bar-goers). If I stay, I get 0. Staying yields a higher payoff given the scenario."
+            }
+          ],
+          "reasoning": "With 9 attendees, the bar is overcrowded (-5 payout). Staying home yields 0, which is better than participating in the overcrowded outcome."
         }
       },
       "lying_agents": [
@@ -373,21 +569,42 @@
           "consensus_stats": {
             "majority_action": "GO",
             "num_responses": 5,
-            "consensus_rate": 0.8,
+            "consensus_rate": 1.0,
             "action_distribution": {
-              "GO": 4,
-              "STAY": 1
+              "GO": 5
             },
-            "is_unanimous": false
+            "is_unanimous": true
           },
           "all_sample_responses": [
             "GO",
-            "STAY",
+            "GO",
             "GO",
             "GO",
             "GO"
           ],
-          "reasoning": "Announcements imply very few others will go (0 others going). If we go, total attendees remain well below 50% (likely 1\u20132 of 9), yielding +10 payoff for bar-goers. STAY gives 0. Therefore GO maximizes expected payout."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "With 0 others going, if you go the bar has <50% attendance (1/9 \u2248 11%), payout $10; staying yields $0."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 0 of the other 8 planning to go, going would still be under 50% (1/9 \u2248 11%), yielding $10 for me, while staying yields $0."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With only 0 of the other 8 planning to go, if I go the total going would be 1 (well below 50%), yielding +10, whereas staying yields 0. It maximizes my expected payoff."
+            },
+            {
+              "action": "GO",
+              "reasoning": "There would be 1/9 go (~11%), which is <50%, so the bar isn't crowded and you would get $10 instead of $0 by staying."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With only 1 person (me) going, the share is below 50%, yielding a $10 payout for those who go. Staying would give $0, so GO maximizes expected payoff."
+            }
+          ],
+          "reasoning": "With 0 others going, if you go the bar has <50% attendance (1/9 \u2248 11%), payout $10; staying yields $0."
         }
       },
       "lying_agents": [
@@ -411,21 +628,42 @@
           "consensus_stats": {
             "majority_action": "GO",
             "num_responses": 5,
-            "consensus_rate": 0.8,
+            "consensus_rate": 1.0,
             "action_distribution": {
-              "GO": 4,
-              "STAY": 1
+              "GO": 5
             },
-            "is_unanimous": false
+            "is_unanimous": true
           },
           "all_sample_responses": [
             "GO",
-            "STAY",
+            "GO",
             "GO",
             "GO",
             "GO"
           ],
-          "reasoning": "From the announcements, among the other eight agents, exactly one will go. If I go, total going = 2 (<5) -> payout +10. If I stay, total going = 1 (<5) but I get 0. Therefore GO maximizes my payoff."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "Going keeps total at 2/9 (~22%), which is under 50%, yielding +10 for those at the bar. Staying would give 0; GO maximizes expected payoff given 1 otherGO and my current public STAY statement."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Only 1 of 9 would go otherwise; by going as well, total attendees become 2/9 \u224822% (<50%), yielding $10 for those at the bar, which is better than $0 if I stay."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 1 other GO and 8 undecided, joining yields 2/9 \u2248 22% going, which is under 50%. That guarantees a +10 payout for those at the bar (no risk of overcrowding under this scenario), so GO maximizes the expected payoff given current information."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Two people would go (you plus the one), which is under 50% of 9, so the bar is enjoyable for goers and you would get $10. Staying would yield $0."
+            },
+            {
+              "action": "GO",
+              "reasoning": "There would be 2 goers total (including me), which is <50% of 9, so the payout is +10 for those at the bar; STAY would yield 0."
+            }
+          ],
+          "reasoning": "Going keeps total at 2/9 (~22%), which is under 50%, yielding +10 for those at the bar. Staying would give 0; GO maximizes expected payoff given 1 otherGO and my current public STAY statement."
         }
       },
       "lying_agents": [
@@ -463,7 +701,29 @@
             "GO",
             "GO"
           ],
-          "reasoning": "Based on the announcements there will be only 2 others going. If I join, 3 go in total (<50%), yielding +10 for those at the bar; staying yields 0. So GO maximizes payoff."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "If I go, total going = 3/9, which is fewer than 50%, so the bar is enjoyable and I get $10. If I stay, I get $0. Going maximizes my payoff despite the prior STAY announcement."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "I publicly announced STAY, so I will stay to honor my commitment. This yields a $0 payoff for me, whereas switching to GO would contradict my prior statement. Under current conditions, staying avoids the risk of changing plans mid-scenario."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 2 others going, switching to GO makes 3 go, which is still under 50% of 9. In that case, the bar is fun and you\u2019d get $10, better than $0 from STAY."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 3 of 9 going (<50%), each goer gets +10. Switching from STAY to GO improves from 0 to +10, while staying would yield 0."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 2 others going, if I also go there would be 3/9 \u2248 33% at the bar, under 50%, yielding +10. Staying yields 0."
+            }
+          ],
+          "reasoning": "If I go, total going = 3/9, which is fewer than 50%, so the bar is enjoyable and I get $10. If I stay, I get $0. Going maximizes my payoff despite the prior STAY announcement."
         }
       },
       "lying_agents": [
@@ -500,7 +760,29 @@
             "GO",
             "GO"
           ],
-          "reasoning": "With 3 others going, if I also go, 4 go total (less than 50%), yielding +10. Staying yields 0. So GO maximizes my payout."
+          "sample_details": [
+            {
+              "action": "GO",
+              "reasoning": "With 3 others going, if I also go there would be 4 out of 9 (\u224844.4%), still under 50%, so I obtain +10. If I stay, only 3 go and I earn 0. So GO maximizes my payout."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With me going, 4 of 9 would attend (3 others plus me), which is below 50%, yielding +10 for bar-goers. Staying would give me 0; going maximizes expected payout."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 3 others going, if I also go the on-bar total is 4, which is under 50% of 9; the bar would be enjoyable and payout is $10 for those at the bar, better than $0 from staying."
+            },
+            {
+              "action": "GO",
+              "reasoning": "Going results in 4/9 (~44.4%) at the bar, which is under 50%, yielding +10 while staying would give you 0."
+            },
+            {
+              "action": "GO",
+              "reasoning": "With 3 others going, if you also go total going = 4 of 9 \u2248 44.4%, below 50% so bar is enjoyable and you get +10. Staying yields 0. Going maximizes expected payout."
+            }
+          ],
+          "reasoning": "With 3 others going, if I also go there would be 4 out of 9 (\u224844.4%), still under 50%, so I obtain +10. If I stay, only 3 go and I earn 0. So GO maximizes my payout."
         }
       },
       "lying_agents": [
@@ -537,7 +819,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "With 4 others going, if I go it would be 5 of 9 (over 50%), causing overcrowding (-5). Staying yields 0, which is better."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "With 4 others going and you staying, only 4/9 go (<50%), so would yield 0 for you vs. going would make 5/9 (\u226550%), causing -5 for you at the bar."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go, 5 of 9 would attend (over 50%), yielding -5 for me. If I stay, only 4 attend (under 50%), yielding 0 for me; so STAY maximizes my payoff given the announced choices."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With you staying, 4 of 9 go (<50%), so the bar is enjoyable for those who go and you get 0. If you went, total would be 5 going (>=50%), causing overcrowding and -5 for you. Staying maximizes your payoff given the current choices."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 4 others going, if I go total going = 5 (overcrowded, -5 payout). If I stay, I get 0. So staying yields a better outcome."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 4 others going, if I GO there would be 5/9 \u2248 55.6% at the bar (overcrowded) and I\u2019d get -5. Staying yields 0, which is better."
+            }
+          ],
+          "reasoning": "With 4 others going and you staying, only 4/9 go (<50%), so would yield 0 for you vs. going would make 5/9 (\u226550%), causing -5 for you at the bar."
         }
       },
       "lying_agents": [],
@@ -572,7 +876,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "If 5 others go, total going = 6, overcrowded (-5). Staying yields 0, so choose STAY."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "If I go, 6 attend (overcrowded) -> -5 payoff. If I stay, 5 attend (overcrowded) but I get 0 payoff for staying. Staying yields higher expected payoff."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "5 others are going. If I stay, I get 0 instead of risking a -5 payout by going (which would be 6 of 9 going, overcrowded). Staying maximizes my payoff under these conditions."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Joining would push total go to 6/9 (overcrowded, payout -5). Staying yields 0, which is better than -5."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 5 of 8 others going, if I go total is 6/9 (overcrowded, -5 for bargoers). Staying yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 5 of the 8 others going, if I go the bar is overcrowded and I would get -5. Staying yields 0, which is better."
+            }
+          ],
+          "reasoning": "If I go, 6 attend (overcrowded) -> -5 payoff. If I stay, 5 attend (overcrowded) but I get 0 payoff for staying. Staying yields higher expected payoff."
         }
       },
       "lying_agents": [],
@@ -607,7 +933,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "Public announcement says 6 others will go. If I go, total going would be at least 7 (over 50%), leading to a -5 payoff for me. Staying yields 0, which is better than the negative outcome."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "6 others go; if I go, 7 go (overcrowded, -5). Staying yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go, 7 of 9 would be at the bar (>=50%), resulting in -5. Staying keeps me at 0 and avoids the overcrowded penalty."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 6 of the 8 others going (total 6/9 \u2248 66.7%), the bar is overcrowded either way. If I go, I\u2019d get -5; if I stay, I get 0. Therefore STAY to maximize payout."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 6 others going, if I stay the bar attendance is 6 (overcrowded), but I would stay home for 0; if I go as well, attendance becomes 7 (also overcrowded) and I would get -5. Therefore STAY yields 0, better than -5."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 6 of 8 others going, if I go the bar will have 7 attendees (overcrowded) and I\u2019d get -5. Staying yields 0 and avoids negative payoff."
+            }
+          ],
+          "reasoning": "6 others go; if I go, 7 go (overcrowded, -5). Staying yields 0, which is better."
         }
       },
       "lying_agents": [],
@@ -642,7 +990,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "From public announcements, 7 of the other 8 will go to the bar, which already exceeds 50% (crowded, payout -5). If I go as well, I\u2019d also get -5; staying yields 0."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "7 of 8 others go, total attendees = 7/9 > 50% => overcrowded if you go; staying yields 0 while going would yield -5, so staying maximizes expected payout."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I STAY, 7 others go (7/9 > 50%), bar overcrowded; but my payoff is 0. If I GO, total is 8/9 at bar (overcrowded) and my payoff would be -5. STAY yields a better outcome."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 7 others going, if I go I\u2019d be in a crowded bar (8/9), getting -5. Staying yields 0, which is better than -5."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go, 8 of 9 would be at the bar (>=50%), giving me -5. If I stay, I get 0 while others go or stay; staying matches my public commitment and yields a nonnegative payoff."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 7 of 9 going, the bar would be overcrowded, giving -5 if you went. Staying yields 0, which is better."
+            }
+          ],
+          "reasoning": "7 of 8 others go, total attendees = 7/9 > 50% => overcrowded if you go; staying yields 0 while going would yield -5, so staying maximizes expected payout."
         }
       },
       "lying_agents": [],
@@ -677,7 +1047,29 @@
             "STAY",
             "STAY"
           ],
-          "reasoning": "Public claim: 8 others will go. If I go, total goers = 9 (overcrowded, -5). If I stay, I get 0. So STAY maximizes my payout."
+          "sample_details": [
+            {
+              "action": "STAY",
+              "reasoning": "With 8 others going, if I go I'd be in an overcrowded bar (9/9), payout -5. Staying yields 0."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "If I go, 9/9 attend -> overcrowded and I get -5. If I stay, 8 go but I get 0 at home, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With 8 others going, if I also go the bar is overcrowded and I\u2019d get -5. Staying yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "With eight others going, if I go the bar is overcrowded (8/9 \u2265 50%), yielding -5. Staying yields 0, which is better."
+            },
+            {
+              "action": "STAY",
+              "reasoning": "Staying yields 0 payout, while going would result in overcrowding with all 9 going, giving -5."
+            }
+          ],
+          "reasoning": "With 8 others going, if I go I'd be in an overcrowded bar (9/9), payout -5. Staying yields 0."
         }
       },
       "lying_agents": [],

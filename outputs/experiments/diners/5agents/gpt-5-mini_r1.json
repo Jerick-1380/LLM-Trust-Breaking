@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "timestamp": "2026-02-10T20:35:00.152697",
+    "timestamp": "2026-02-11T22:25:45.106471",
     "game_type": "diners",
     "n_agents": 5,
     "total_scenarios": 10
@@ -59,7 +59,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "Choosing EXPENSIVE strictly dominates CHEAP: regardless of how many of the 4 others pick EXPENSIVE, EXPENSIVE yields 3.8 higher payoff. With others likely CHEAP, EXPENSIVE gives 6.8 vs 3.0 for CHEAP."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I order EXPENSIVE while others order CHEAP, payoff = 10 - (8+4*2)/5 = 10 - 3.2 = 6.8, which is higher than choosing CHEAP (5 - 10/5 = 3). Therefore EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "For any number k of other EXPENSIVE orders (0\u20134), choosing EXPENSIVE yields payoff = 6.8 \u2212 1.2k, while choosing CHEAP yields 3 \u2212 1.2k. EXPENSIVE always gives 3.8 higher payoff, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If the other four order CHEAP, total bill = 4*2 + 8 = 16, share = 3.2, so payoff = 10 - 3.2 = 6.8, which is greater than choosing CHEAP (payoff 5 - 2 = 3). Thus EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I order EXPENSIVE while the other 4 order CHEAP, total bill = 8 + 4*2 = 16, share = 3.2, payoff = 10 - 3.2 = 6.8. If I order CHEAP with all others CHEAP, payoff = 5 - 2 = 3. EXPENSIVE yields the higher payoff."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I choose EXPENSIVE and the other 4 choose CHEAP, total bill = 8 + 4*2 = 16, share = 3.2, payoff = 10 - 3.2 = 6.8. If I choose CHEAP, share = 2, payoff = 5 - 2 = 3. EXPENSIVE yields higher payoff."
+            }
+          ],
+          "reasoning": "If I order EXPENSIVE while others order CHEAP, payoff = 10 - (8+4*2)/5 = 10 - 3.2 = 6.8, which is higher than choosing CHEAP (5 - 10/5 = 3). Therefore EXPENSIVE maximizes my payout."
         }
       },
       "lying_agents": [],
@@ -94,7 +116,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "Choosing EXPENSIVE strictly yields a higher personal payoff across all possible counts of others: with the announced 1 other choosing EXPENSIVE, my payoff would be 10 - 22/5 = 5.6 vs 5 - 16/5 = 1.8 if I chose CHEAP, and EXPENSIVE remains better under other plausible mixes."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Choosing EXPENSIVE yields payoff =10 - (2+1.2*(#exp_total)) and CHEAP yields 5 - (2+1.2*(#exp_total-1)); the difference is always +3.8 in favor of EXPENSIVE, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If the announced choices hold (2 expensive, 3 cheap), total bill = $22 \u2192 $4.40 per person. Choosing EXPENSIVE gives payoff 10 - 4.40 = 5.60, while choosing CHEAP gives 5 - 3.20 = 1.80, so EXPENSIVE yields a higher payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If others stick to announcements (1 other EXPENSIVE, 3 CHEAP), choosing EXPENSIVE gives payoff 10 - (2*8+3*2)/5 = 10 - 4.4 = 5.6, whereas choosing CHEAP gives 5 - (1*8+4*2)/5 = 5 - 3.2 = 1.8. EXPENSIVE yields higher payoff."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "EXPENSIVE yields payoff 8 - 1.2E while CHEAP yields 3 - 1.2E, so EXPENSIVE is always $5 better regardless of how many others choose EXPENSIVE."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Choosing EXPENSIVE always yields a higher payoff: compared to CHEAP I gain +$3.80 regardless of how many others choose EXPENSIVE (because the shared bill effect cancels), so EXPENSIVE maximizes my payout."
+            }
+          ],
+          "reasoning": "Choosing EXPENSIVE yields payoff =10 - (2+1.2*(#exp_total)) and CHEAP yields 5 - (2+1.2*(#exp_total-1)); the difference is always +3.8 in favor of EXPENSIVE, so EXPENSIVE maximizes my payout."
         }
       },
       "lying_agents": [],
@@ -129,7 +173,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "If the announced 2 others choose EXPENSIVE, my payoff choosing EXP = 10 - (10+6*3)/5 = 4.4 while CHEAP yields 0.6. EXPENSIVE dominates given the public count."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "With 2 others already committed to EXPENSIVE, choosing EXPENSIVE gives payoff = 10 - (6(3+x)+10)/5 = 4.4 -1.2x, while CHEAP gives 0.6 -1.2x. EXPENSIVE yields +3.8 higher payoff for any number x (0\u20132) of remaining expensive orders, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Choosing EXPENSIVE yields payoff = 10 - (total bill/5) while CHEAP yields 5 - (total bill/5 minus 6/5). The difference is constant: EXPENSIVE gives 3.8 higher payoff than CHEAP (so EXPENSIVE strictly dominates), hence I order EXPENSIVE."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Given at least 2 other diners will order EXPENSIVE (so expensive count among others x\u22652), my payoff choosing EXPENSIVE is higher than choosing CHEAP for x=2,3,4 (4.4 vs 0.6; 3.2 vs -0.6; 2.0 vs -1.8), so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "For any number x of the other four diners choosing EXPENSIVE (x=2\u20134), payoffs compute to (34-6x)/5 for EXPENSIVE and (15-6x)/5 for CHEAP; EXPENSIVE is always 3.8 higher, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "With 2 others already committed to EXPENSIVE, for any possible choices of the remaining two (0\u20132 more EXPENSIVE), choosing EXPENSIVE yields higher payoff (4.4, 3.2, or 2.0) than choosing CHEAP (0.6, -0.6, or -1.8). Therefore EXPENSIVE maximizes my payout."
+            }
+          ],
+          "reasoning": "With 2 others already committed to EXPENSIVE, choosing EXPENSIVE gives payoff = 10 - (6(3+x)+10)/5 = 4.4 -1.2x, while CHEAP gives 0.6 -1.2x. EXPENSIVE yields +3.8 higher payoff for any number x (0\u20132) of remaining expensive orders, so EXPENSIVE maximizes my payout."
         }
       },
       "lying_agents": [],
@@ -164,7 +230,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "If the other 3 actually pick EXPENSIVE, choosing EXPENSIVE gives payoff 10 - (34/5)=3.2, while CHEAP gives 5 - (28/5)=-0.6, so EXPENSIVE yields higher payoff."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If the other three who announced EXPENSIVE do so and the fourth chooses CHEAP, choosing EXPENSIVE gives payoff 10 - (4*8+1*2)/5 = 3.2, while choosing CHEAP gives 5 - (3*8+2*2)/5 = -0.6, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "With 3 others choosing EXPENSIVE, ordering EXPENSIVE yields higher payoff in either case: if the fourth picks EXPENSIVE my payoff = 10 - 8 = 2; if the fourth picks CHEAP my payoff = 10 - 6.8 = 3.2. CHEAP would give negative payoffs in both cases, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "With 3 others announced EXPENSIVE (and at most one other CHEAP), choosing EXPENSIVE yields payoff \u224810\u2212(34/5)=3.2 (or at worst 10\u22128=2 if all others pick EXPENSIVE), which is higher than the CHEAP payoff in those cases."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I and the three others who announced EXPENSIVE follow through and the remaining diner chooses CHEAP, the bill = 4*8+1*2=34 -> share=6.8. EXPENSIVE payoff = 10-6.8=3.2, while switching to CHEAP would give 5-(28/5)=5-5.6=-0.6, so EXPENSIVE yields a higher payoff."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "In every plausible distribution (the remaining diner choosing EXPENSIVE or CHEAP), choosing EXPENSIVE yields a higher payoff: if all 5 pick EXP, payoff = 10 - 8 = 2; if 4 EXP + 1 CHEAP, choosing EXP gives 10 - 6.8 = 3.2 while CHEAP gives lower payoff in both cases."
+            }
+          ],
+          "reasoning": "If the other three who announced EXPENSIVE do so and the fourth chooses CHEAP, choosing EXPENSIVE gives payoff 10 - (4*8+1*2)/5 = 3.2, while choosing CHEAP gives 5 - (3*8+2*2)/5 = -0.6, so EXPENSIVE maximizes my payout."
         }
       },
       "lying_agents": [],
@@ -199,7 +287,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "If all four others choose EXPENSIVE as announced, choosing EXPENSIVE yields payoff 10 - (40/5)=2, while choosing CHEAP yields 5 - (34/5) = -1.8. EXPENSIVE maximizes my payout given the announcements."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I choose EXPENSIVE with the other 4 EXPENSIVE, payoff = 10 - (5*8/5) = 2. If I switch to CHEAP while others are EXPENSIVE, payoff = 5 - ((4*8+2)/5) = -1.8. EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If all 5 choose EXPENSIVE my payoff is 10 - (5*8/5) = 2. If I switch to CHEAP while others remain EXPENSIVE, my payoff is 5 - ((4*8+2)/5) = -1.8, so EXPENSIVE yields a higher payoff."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I switch to CHEAP while others pick EXPENSIVE my payoff = 5 - (4*8+2)/5 = 5 - 6.8 = -1.8. Staying EXPENSIVE gives 10 - (5*8)/5 = 2, which is higher."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If all 5 order EXPENSIVE my payoff = 10 - 8 = 2. If I switch to CHEAP while others order EXPENSIVE my payoff = 5 - (4*8+2)/5 = 5 - 6.8 = -1.8, so EXPENSIVE yields a higher payoff."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If all 5 choose EXPENSIVE total bill = $40 so per-person cost = $8; my payoff = $10 - $8 = $2. If I switch to CHEAP while others pick EXPENSIVE, total bill = $34 so per-person cost = $6.80; my payoff = $5 - $6.80 = -$1.80. EXPENSIVE yields higher payoff."
+            }
+          ],
+          "reasoning": "If I choose EXPENSIVE with the other 4 EXPENSIVE, payoff = 10 - (5*8/5) = 2. If I switch to CHEAP while others are EXPENSIVE, payoff = 5 - ((4*8+2)/5) = -1.8. EXPENSIVE maximizes my payout."
         }
       },
       "lying_agents": [],
@@ -234,7 +344,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "Choosing EXPENSIVE always yields a higher payoff: regardless of how many others pick EXPENSIVE, the expected payoff difference is +3.8 in favor of EXPENSIVE (so it dominates CHEAP)."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If others stick with CHEAP (0 expensive), my payoff is higher by choosing EXPENSIVE: EXPENSIVE payoff = 10 - (16/5) = 6.8 vs CHEAP payoff = 5 - (10/5) = 3. Choosing EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If the other four stick to CHEAP (as announced), my deviation to EXPENSIVE yields payoff 10 - (8+4*2)/5 = 10 - 3.2 = 6.8, which is greater than staying CHEAP: 5 - (5*2)/5 = 3.0."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Choosing EXPENSIVE strictly increases my payoff by $5 regardless of others (payoff_EXP = 8 - 1.2E, payoff_CHEAP = 3 - 1.2E), so EXPENSIVE is dominant."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Given 0 others announced expensive, likely all choose CHEAP; by defecting I get 10 - (8+4*2)/5 = 6.8 vs staying CHEAP yields 5 - (5*2)/5 = 3, so EXPENSIVE maximizes my payoff."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If everyone else orders CHEAP (as announced), my payoff is higher by choosing EXPENSIVE: 10 - (8+4*2)/5 = 6.8 vs 5 - (5*2)/5 = 3.0, so EXPENSIVE maximizes my payout."
+            }
+          ],
+          "reasoning": "If others stick with CHEAP (0 expensive), my payoff is higher by choosing EXPENSIVE: EXPENSIVE payoff = 10 - (16/5) = 6.8 vs CHEAP payoff = 5 - (10/5) = 3. Choosing EXPENSIVE maximizes my payout."
         }
       },
       "lying_agents": [
@@ -271,7 +403,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "Regardless of how many others pick EXPENSIVE (0\u20134), choosing EXPENSIVE yields a higher payoff (difference = $3.80) because the extra Joy ($5) outweighs the added share of cost."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "For any number k of the other 4 choosing EXPENSIVE, my payoff if I pick EXPENSIVE = 10 - (6k+16)/5 and if I pick CHEAP = 5 - (6k+10)/5. The difference is 3.8 in favor of EXPENSIVE, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Choosing EXPENSIVE strictly increases my payoff: if e others order EXPENSIVE, my payoff CHEAP = 3 - 1.2e, EXPENSIVE = 6.8 - 1.2e, so EXPENSIVE is always 3.8 higher (dominant strategy)."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If others follow announcements (1 expensive, 3 cheap), choosing EXPENSIVE gives payoff 10 - (22/5)=5.6 vs CHEAP gives 5 - (16/5)=1.8, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Ordering EXPENSIVE strictly increases my payoff. Regardless of how many of the other three actually choose EXPENSIVE, my payoff when I pick EXPENSIVE exceeds CHEAP by $3.80 because the extra joy (10 vs 5) outweighs the added shared cost."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Given announced choices (1 other EXPENSIVE, 3 CHEAP), choosing EXPENSIVE yields payoff 10 - (2*8+3*2)/5 = 10 - 4.4 = 5.6, while choosing CHEAP yields 5 - (8+4*2)/5 = 1.8, so EXPENSIVE maximizes my payout."
+            }
+          ],
+          "reasoning": "For any number k of the other 4 choosing EXPENSIVE, my payoff if I pick EXPENSIVE = 10 - (6k+16)/5 and if I pick CHEAP = 5 - (6k+10)/5. The difference is 3.8 in favor of EXPENSIVE, so EXPENSIVE maximizes my payout."
         }
       },
       "lying_agents": [
@@ -308,7 +462,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "If the two others who announced EXPENSIVE follow through, choosing EXPENSIVE yields payoff 10 - (28/5) = 4.4 vs CHEAP yields 5 - (22/5) = 0.6, so EXPENSIVE maximizes my payoff."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Choosing EXPENSIVE gives +5 additional joy but only increases my share of the bill by (8\u22122)/5=1.2, so net +3.8 relative to CHEAP \u2014 EXPENSIVE strictly increases my payoff."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Choosing EXPENSIVE yields payoff = (34-6k)/5 vs CHEAP = (15-6k)/5 for any number k of other EXPENSIVE orders, so EXPENSIVE strictly dominates (higher payoff by 3.8)."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "With 2 other confirmed EXPENSIVE (m=2), EXP payoff = 10 - (6m+16)/5 = 4.4, CHEAP payoff = 5 - (6m+10)/5 = 0.6. EXPENSIVE yields higher payoff."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Given two others will pick EXPENSIVE, choosing EXPENSIVE gives payoff = 10 - share and choosing CHEAP gives 5 - share; calculating shows EXPENSIVE yields 3.8 higher payoff regardless of the other two unknowns, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "With at least 2 others ordering expensive, choosing EXPENSIVE yields higher payoff: e.g. if others =2, my payoff EXP = 4.4 vs CHEAP = 0.6 (and EXP remains better for any higher number of others expensive)."
+            }
+          ],
+          "reasoning": "Choosing EXPENSIVE gives +5 additional joy but only increases my share of the bill by (8\u22122)/5=1.2, so net +3.8 relative to CHEAP \u2014 EXPENSIVE strictly increases my payoff."
         }
       },
       "lying_agents": [
@@ -345,7 +521,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "Choosing EXPENSIVE yields higher payoff than CHEAP for any number of expensive choices by others (dominant): it always gives +3.8 higher payoff (e.g., with announced 3 others expensive, EXPENSIVE payoff = 3.2 vs CHEAP = -0.6)."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I choose EXPENSIVE, total cost = 4*8 + 1*2 = 34, split = 6.8, payoff = 10 - 6.8 = 3.2. If I stick with CHEAP, total cost = 3*8 + 2*2 = 28, split = 5.6, payoff = 5 - 5.6 = -0.6. EXPENSIVE yields a higher payoff."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "With 3 others committed to EXPENSIVE and one unknown, choosing EXPENSIVE yields payoffs of 3.2 (if the unknown picks CHEAP) or 2.0 (if the unknown picks EXPENSIVE), both higher than staying CHEAP (\u22120.6 or \u22121.8). EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "With 3 others committed expensive and one unknown, choosing EXPENSIVE yields payoff 2.0 (if the unknown picks expensive) or 3.2 (if unknown picks cheap), whereas choosing CHEAP yields -1.8 or -0.6 respectively. EXPENSIVE dominates."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "Given three others will order EXPENSIVE and one CHEAP, choosing EXPENSIVE gives payoff 10 - (34/5) = 3.2 vs choosing CHEAP gives 5 - (28/5) = -0.6, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I stick CHEAP (3 expensive, 2 cheap) my payoff = 5 - (28/5) = -0.6. If I switch to EXPENSIVE (4 expensive,1 cheap) my payoff = 10 - (34/5) = 3.2, which is higher."
+            }
+          ],
+          "reasoning": "If I choose EXPENSIVE, total cost = 4*8 + 1*2 = 34, split = 6.8, payoff = 10 - 6.8 = 3.2. If I stick with CHEAP, total cost = 3*8 + 2*2 = 28, split = 5.6, payoff = 5 - 5.6 = -0.6. EXPENSIVE yields a higher payoff."
         }
       },
       "lying_agents": [
@@ -382,7 +580,29 @@
             "EXPENSIVE",
             "EXPENSIVE"
           ],
-          "reasoning": "If the other 4 choose EXPENSIVE as announced, picking EXPENSIVE gives payoff 10 - (5*8)/5 = 2, while CHEAP gives 5 - (4*8+2)/5 = -1.8, so EXPENSIVE maximizes my payout."
+          "sample_details": [
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I choose EXPENSIVE my payoff = 10 - (40/5) = 2.00; if I stick to CHEAP my payoff = 5 - (34/5) = -1.80. EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If the other 4 order EXPENSIVE, choosing EXPENSIVE gives payoff 10 - (5*8/5) = 2, whereas choosing CHEAP gives 5 - ((4*8+2)/5) = -1.8, so EXPENSIVE maximizes my payout."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I stick with CHEAP while 4 others pick EXPENSIVE my payoff = 5 - (2+4*8)/5 = 5 - 6.8 = -1.8. If I switch to EXPENSIVE payoff = 10 - (5*8)/5 = 10 - 8 = 2, which is higher, so choose EXPENSIVE."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I stick to CHEAP while 4 others pick EXPENSIVE my payoff = 5 - (4*8+2)/5 = 5 - 6.8 = -1.8. If I switch to EXPENSIVE payoff = 10 - (5*8)/5 = 10 - 8 = 2, which is higher, so choose EXPENSIVE."
+            },
+            {
+              "action": "EXPENSIVE",
+              "reasoning": "If I pick EXPENSIVE with 4 others expensive: payoff = 10 - (5*8/5) = 2. If I pick CHEAP instead: payoff = 5 - ((4*8+2)/5) = -1.8. EXPENSIVE maximizes my payout."
+            }
+          ],
+          "reasoning": "If I choose EXPENSIVE my payoff = 10 - (40/5) = 2.00; if I stick to CHEAP my payoff = 5 - (34/5) = -1.80. EXPENSIVE maximizes my payout."
         }
       },
       "lying_agents": [
