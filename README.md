@@ -328,20 +328,7 @@ LLM-Promise-Breaking/
 ├── outputs/                       # Results (11MB total)
 │   ├── experiments/               # 297 JSON files with raw data
 │   └── *.txt                      # Analysis reports
-├── .claude/
-│   └── CLAUDE.md                  # Detailed project documentation
 ├── requirements.txt
 └── README.md
 ```
-
----
-
-## Documentation
-
-**For detailed technical documentation**, see [.claude/CLAUDE.md](.claude/CLAUDE.md) which includes:
-- Recent bug fixes and their impact
-- Lying categorization framework details
-- Binary vs continuous state computation
-- Testing and debugging guides
-- Complete methodology
 
