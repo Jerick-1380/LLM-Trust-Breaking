@@ -68,15 +68,15 @@ class FishingGame(GameDefinition):
 
         Args:
             agent_names: List of agent names
-            collapse_threshold: Maximum sustainable catch. If None, defaults to num_agents * 3
+            collapse_threshold: Maximum sustainable catch. If None, defaults to num_agents * 3 - 1
             max_catch_per_agent: Maximum fish each agent can catch (default: 5)
         """
         super().__init__(agent_names)
 
-        # Calculate default threshold based on number of agents (3 * num_agents)
-        # This creates a tragedy of the commons where everyone catching max (5) will collapse
+        # Calculate default threshold based on number of agents (3n-1).
+        # Catching exactly 3 per agent is already too much; the safe total is 3n-1.
         if collapse_threshold is None:
-            collapse_threshold = len(agent_names) * 3
+            collapse_threshold = len(agent_names) * 3 - 1
 
         self.collapse_threshold = collapse_threshold
         self.max_catch_per_agent = max_catch_per_agent
