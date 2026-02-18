@@ -538,7 +538,7 @@ def _run_reflection(
     results = {}
     for agent_name, req in requests:
         cid = req["custom_id"]
-        parsed = _parse_response(raw.get(cid, {}), [])
+        parsed = _parse_response(raw.get(cid, {}), ["takeaways"])
         raw_takeaways = parsed.get("takeaways", {})
         # Ensure it's a dict; fall back gracefully
         if not isinstance(raw_takeaways, dict):
@@ -742,10 +742,10 @@ def run_all_trials(
 
     start_time = time.time()
 
-    # Takeaways: takeaways[trial_id][focal_agent][other_agent] = str
-    current_takeaways: Dict[int, Dict[str, Dict[str, str]]] = {
+    # Takeaways: takeaways[trial_id][focal_agent][other_agent] = {"score": int, "assessment": str}
+    current_takeaways: Dict[int, Dict[str, Dict[str, Any]]] = {
         tid: {
-            agent: {other: "" for other in agent_names if other != agent}
+            agent: {other: {} for other in agent_names if other != agent}
             for agent in agent_names
         }
         for tid in range(n_trials)
@@ -756,7 +756,7 @@ def run_all_trials(
     for round_idx in range(n_rounds):
         print(f"--- Round {round_idx + 1} / {n_rounds} ---")
         round_results = []
-        do_reflect = (round_idx < n_rounds - 1)  # reflect after every round except the last
+        do_reflect = (n_rounds > 1)  # reflect after every round when running multi-round
 
         iterator = range(n_trials)
         if show_progress:
@@ -784,9 +784,9 @@ def run_all_trials(
                 for agent_name in agent_names:
                     refl = result["agents"][agent_name].get("reflection", {})
                     new_tw = refl.get("takeaways", {})
-                    for other, text in new_tw.items():
+                    for other, val in new_tw.items():
                         if other in current_takeaways[trial_id][agent_name]:
-                            current_takeaways[trial_id][agent_name][other] = text
+                            current_takeaways[trial_id][agent_name][other] = val
 
         all_rounds.append({"round_id": round_idx, "trials": round_results})
 
@@ -947,10 +947,10 @@ def run_all_trials_queued(
 
     start_time = time.time()
 
-    # Takeaways: [trial_id][focal_agent][other_agent] = str  (all empty initially)
-    current_takeaways: Dict[int, Dict[str, Dict[str, str]]] = {
+    # Takeaways: [trial_id][focal_agent][other_agent] = {"score": int, "assessment": str}
+    current_takeaways: Dict[int, Dict[str, Dict[str, Any]]] = {
         tid: {
-            agent: {other: "" for other in agent_names if other != agent}
+            agent: {other: {} for other in agent_names if other != agent}
             for agent in agent_names
         }
         for tid in trial_ids
@@ -963,7 +963,7 @@ def run_all_trials_queued(
     # ------------------------------------------------------------------
     for round_idx in range(n_rounds):
         t_round_start = time.time()
-        do_reflect = (round_idx < n_rounds - 1)
+        do_reflect = (n_rounds > 1)
         print(f"\n=== Round {round_idx + 1} / {n_rounds} ===")
 
         # ---- Stage 1 ----
@@ -1226,7 +1226,7 @@ def run_all_trials_queued(
                 outcomes = _compute_outcomes(game_type, agent_names, game_params, choices)
                 for agent_name in agent_names:
                     cid = f"r{round_idx}_t{trial_id}_refl_{agent_name}"
-                    parsed = _parse_response(refl_raw.get(cid, {}), [])
+                    parsed = _parse_response(refl_raw.get(cid, {}), ["takeaways"])
                     raw_tw = parsed.get("takeaways", {})
                     if not isinstance(raw_tw, dict):
                         raw_tw = {}
@@ -1236,9 +1236,9 @@ def run_all_trials_queued(
                         "_parse_ok": bool(raw_tw),
                     }
                     # Update takeaways for next round
-                    for other, text in raw_tw.items():
+                    for other, val in raw_tw.items():
                         if other in current_takeaways[trial_id][agent_name]:
-                            current_takeaways[trial_id][agent_name][other] = text
+                            current_takeaways[trial_id][agent_name][other] = val
 
         t_round = time.time() - t_round_start
         print(f"  Round {round_idx + 1} done in {t_round:.1f}s")

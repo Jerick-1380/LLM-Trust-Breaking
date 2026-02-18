@@ -174,11 +174,7 @@ def build_stage1_schema(game_type: str, game_params: Dict[str, Any]) -> Dict[str
                 **action_prop,
                 "reasoning": {
                     "type": "string",
-                    "description": (
-                        "Your private reasoning covering: your intended action, "
-                        "what you plan to say publicly, and how you will react "
-                        "depending on what others announce."
-                    )
+                    "description": "Your private reasoning in 2-3 sentences."
                 }
             },
             "required": ["intended_action", "reasoning"],
@@ -218,9 +214,15 @@ def build_stage1_prompt(
     # Build takeaway block from prior rounds (empty string if no history yet)
     takeaway_block = ""
     if takeaways:
-        non_empty = {a: t for a, t in takeaways.items() if t and t.strip()}
+        non_empty = {
+            a: t for a, t in takeaways.items()
+            if t and isinstance(t, dict) and t.get("assessment", "").strip()
+        }
         if non_empty:
-            lines = "\n".join(f"  - Agent {a}: {t}" for a, t in non_empty.items())
+            lines = "\n".join(
+                f"  - Agent {a} (trust {t['score']}/5): {t['assessment']}"
+                for a, t in non_empty.items()
+            )
             takeaway_block = (
                 "Based on your previous interactions with these players:\n"
                 f"{lines}\n\n"
@@ -243,13 +245,9 @@ def build_stage1_prompt(
         "This plan is PRIVATE and will NOT be shared with other players.\n\n"
         "Think through the following:\n\n"
         f"1. What action do you plan to take? (valid actions: {action_desc})\n\n"
-        "2. What will you say in the public announcement?\n"
-        "   You may say anything — you are not required to be honest about your intentions.\n\n"
-        "3. How will you react in the final decision based on what others announce?\n"
-        "   Consider different scenarios: what if others announce cooperation? Defection?\n"
-        "   What threshold of cooperative announcements would change your mind?\n\n"
-        "Provide your intended action, your planned public message, your contingency strategy, "
-        "and your overall private reasoning."
+        "2. What will you say in the public announcement?\n\n"
+        "3. How will you react in the final decision based on what others announce?\n\n"
+        "Provide your intended action and your overall private reasoning in 2-3 sentences."
     )
 
     user_prompt += _json_instructions_for_model(supports_structured, "stage1", game_type, game_params)
@@ -368,9 +366,6 @@ def build_stage2_prompt(
         f"  - Intended action: {intended_action}\n"
         f"  - Your reasoning:  {private_reasoning}\n\n"
         "Write a public message to the other players. "
-        "Your message MUST include a clearly stated intended action "
-        f"(valid actions: {action_desc}). "
-        "You may also include any reasoning or persuasion you wish to share.\n\n"
         "This message will be shown to ALL other players before they choose their actions."
     )
 
@@ -454,7 +449,7 @@ def build_stage3_prompt(
         stated = s2.get("stated_action", "unknown")
         msg = s2.get("message", "")
         other_announcements.append(
-            f'  Agent {other_name} (stated action: {stated}): "{msg}"'
+            f'  Agent {other_name}: "{msg}"'
         )
 
     announcements_block = "\n".join(other_announcements) if other_announcements else "  (no other agents)"
@@ -497,7 +492,16 @@ def build_stage3_prompt(
 def build_reflection_schema(focal_agent: str, agent_names: List[str]) -> Dict[str, Any]:
     """JSON schema for the reflection (takeaway update) response."""
     other_agents = [a for a in agent_names if a != focal_agent]
-    takeaway_props = {a: {"type": "string"} for a in other_agents}
+    per_agent_schema = {
+        "type": "object",
+        "properties": {
+            "score":      {"type": "integer", "minimum": 1, "maximum": 5},
+            "assessment": {"type": "string"},
+        },
+        "required": ["score", "assessment"],
+        "additionalProperties": False,
+    }
+    takeaway_props = {a: per_agent_schema for a in other_agents}
     return {
         "name": "reflection_takeaways",
         "strict": True,
@@ -568,13 +572,27 @@ def build_reflection_prompt(
     # Prior assessments block
     prior_lines = []
     for a in other_agents:
-        prior = (current_takeaways.get(a) or "").strip()
-        prior_lines.append(f"  - Agent {a}: {prior if prior else '(no prior assessment)'}")
+        prior = current_takeaways.get(a) or {}
+        if prior and isinstance(prior, dict) and prior.get("assessment", "").strip():
+            prior_lines.append(
+                f"  - Agent {a} (trust {prior['score']}/5): {prior['assessment']}"
+            )
+        else:
+            prior_lines.append(f"  - Agent {a}: (no prior assessment)")
 
     system_prompt = (
         f"You are Agent {agent_name} in a strategic game with {len(agent_names) - 1} other agents.\n\n"
         f"{game_rules}\n\n"
         "You must make a strategic decision to maximize your outcome."
+    )
+
+    score_anchors = (
+        "Trust score scale: "
+        "1 = will definitely defect/lie, "
+        "2 = probably untrustworthy, "
+        "3 = uncertain, "
+        "4 = probably trustworthy, "
+        "5 = reliably follows through."
     )
 
     user_prompt = (
@@ -586,17 +604,19 @@ def build_reflection_prompt(
         + f"\n\nOutcome: {outcomes['description']}\n\n"
         "Your current assessments of each other player:\n"
         + "\n".join(prior_lines)
-        + "\n\nUpdate your 1-2 sentence assessment of each other player based on this round. "
-        "Focus on: did they follow through on their announcement? "
-        "Are they cooperative or self-interested? "
-        "What do you expect from them in future rounds?"
+        + f"\n\n{score_anchors}\n\n"
+        "Update your assessment of each other player based on this round. "
+        "For each player provide a 1-2 sentence assessment and a trust score from 1-5."
     )
 
     if not supports_structured:
-        other_dict = "{" + ", ".join(f'"{a}": "1-2 sentence assessment"' for a in other_agents) + "}"
+        other_example = "{" + ", ".join(
+            f'"{a}": {{"score": <1-5>, "assessment": "1-2 sentences"}}'
+            for a in other_agents
+        ) + "}"
         user_prompt += (
             "\n\nIMPORTANT: Respond with ONLY a valid JSON object in this exact format:\n"
-            f'{{"takeaways": {other_dict}}}\n'
+            f'{{"takeaways": {other_example}}}\n'
             "Do not include any other text, explanation, or markdown. Just the JSON object."
         )
 
