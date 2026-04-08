@@ -5,7 +5,7 @@ import asyncio
 import aiohttp
 import json
 import time
-from openai import AsyncOpenAI
+from tqdm import tqdm
 
 
 class QueuedOpenAIClient:
@@ -16,10 +16,47 @@ class QueuedOpenAIClient:
     Much more efficient than batch execution when requests have variable latency.
     """
 
+    # Models that support structured outputs via response_format parameter
+    STRUCTURED_OUTPUT_MODELS = {
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4-turbo",
+        "gpt-4",
+        "gpt-3.5-turbo",
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-5-nano",
+        "gpt-5-pro",
+        "gpt-5.2",
+        "o1-mini",
+        "o1-preview",
+        "o3-mini",
+    }
+
+    # Reasoning models that don't support temperature/seed
+    REASONING_MODELS = {
+        "o1-mini",
+        "o1-preview",
+        "o3-mini",
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-5-nano",
+        "gpt-5-pro",
+        "gpt-5.2",
+    }
+
+    # GPT-5 models that use responses API instead of chat completions
+    GPT5_MODELS = {
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-5-nano",
+        "gpt-5-pro",
+        "gpt-5.2",
+    }
+
     def __init__(
         self,
         api_key: str,
-        model: str,
         max_workers: int = 50,
         timeout: int = 120,
         max_retries: int = 3
@@ -29,17 +66,16 @@ class QueuedOpenAIClient:
 
         Args:
             api_key: OpenAI API key
-            model: Model to use (e.g., 'gpt-5-mini')
             max_workers: Number of concurrent worker tasks (default: 50)
             timeout: Request timeout in seconds (default: 120)
             max_retries: Maximum number of retry attempts (default: 3)
         """
         self.api_key = api_key
-        self.model = model
+        self.chat_url = "https://api.openai.com/v1/chat/completions"
+        self.responses_url = "https://api.openai.com/v1/responses"
         self.max_workers = max_workers
         self.timeout = timeout
         self.max_retries = max_retries
-        self.is_gpt5 = 'gpt-5' in model.lower()
 
     def execute_all(
         self,
@@ -86,116 +122,337 @@ class QueuedOpenAIClient:
         completed_count = 0
         results_lock = asyncio.Lock()
 
-        # Create async OpenAI client
-        client = AsyncOpenAI(api_key=self.api_key, timeout=self.timeout)
+        # Configure connection pooling
+        connector = aiohttp.TCPConnector(
+            limit=self.max_workers * 2,
+            limit_per_host=self.max_workers,
+            ttl_dns_cache=300,
+            enable_cleanup_closed=True
+        )
 
-        async def worker():
-            """Worker that continuously processes queue items."""
-            nonlocal completed_count
+        timeout_obj = aiohttp.ClientTimeout(total=self.timeout)
 
-            while True:
-                request = await queue.get()
+        async with aiohttp.ClientSession(timeout=timeout_obj, connector=connector) as session:
+            # Producer: Add all requests to queue upfront
+            for request in requests_list:
+                await queue.put(request)
 
-                # Check for sentinel value (stop signal)
-                if request is None:
-                    queue.task_done()
-                    break
+            # Add sentinel values to signal workers to stop
+            for _ in range(self.max_workers):
+                await queue.put(None)
 
-                custom_id = request['custom_id']
+            # Consumer: Create worker tasks
+            async def worker():
+                nonlocal completed_count
 
-                # Process request with retries
-                for attempt in range(self.max_retries):
+                while True:
+                    request = await queue.get()
+
+                    # Check for sentinel value
+                    if request is None:
+                        queue.task_done()
+                        break
+
                     try:
-                        messages = request['messages']
+                        # Execute request
+                        custom_id, response = await self._execute_single_async(
+                            session, request
+                        )
 
-                        if self.is_gpt5:
-                            # GPT-5 uses responses API
-                            # Combine messages into single input
-                            combined_input = "\n\n".join([f"{m['role']}: {m['content']}" for m in messages])
-                            combined_input += "\n\nIMPORTANT: Respond with ONLY valid JSON. No explanation, just the JSON object."
-
-                            response = await client.responses.create(
-                                model=self.model,
-                                input=combined_input,
-                                reasoning={"effort": "minimal"},
-                                text={"verbosity": "low"},
-                                max_output_tokens=max(request.get('max_tokens', 100) * 3, 300)
-                            )
-
-                            raw = response.output_text.strip()
-
-                            # Extract JSON if wrapped
-                            if "```json" in raw:
-                                raw = raw.split("```json")[1].split("```")[0].strip()
-                            elif "```" in raw:
-                                raw = raw.split("```")[1].split("```")[0].strip()
-
-                            parsed = json.loads(raw)
-                            result = custom_id, parsed
-                        else:
-                            # GPT-4 and earlier use chat API with structured outputs
-                            kwargs = {
-                                "model": self.model,
-                                "messages": messages,
-                                "max_tokens": request.get('max_tokens', 100),
-                                "temperature": request.get('temperature', 1.0)
-                            }
-
-                            if 'response_format' in request:
-                                kwargs['response_format'] = request['response_format']
-
-                            response = await client.chat.completions.create(**kwargs)
-                            content = response.choices[0].message.content
-
-                            # Try to parse as JSON
-                            try:
-                                parsed = json.loads(content)
-                                result = custom_id, parsed
-                            except json.JSONDecodeError:
-                                result = custom_id, {"content": content}
-
-                        # Success - store result
+                        # Store result
                         async with results_lock:
-                            results[custom_id] = result[1]
+                            results[custom_id] = response
                             completed_count += 1
+
+                            # Call progress callback
                             if progress_callback:
                                 progress_callback(completed_count, total_requests)
 
-                        break  # Success, exit retry loop
-
                     except Exception as e:
-                        if attempt < self.max_retries - 1:
-                            # Retry with exponential backoff
-                            wait_time = (2 ** attempt) + (time.time() % 1)
-                            await asyncio.sleep(wait_time)
-                        else:
-                            # Max retries exceeded
-                            async with results_lock:
-                                results[custom_id] = {
-                                    "status": "error",
-                                    "error": f"Max retries exceeded: {str(e)}"
-                                }
-                                completed_count += 1
-                                if progress_callback:
-                                    progress_callback(completed_count, total_requests)
+                        # Log error but continue processing
+                        custom_id = request.get('custom_id', 'unknown')
+                        print(f"Worker error for {custom_id}: {e}")
 
-                queue.task_done()
+                        # Store error response
+                        async with results_lock:
+                            results[custom_id] = {
+                                "status": "error",
+                                "error": str(e)
+                            }
 
-        # Producer: Add all requests to queue upfront
-        for request in requests_list:
-            await queue.put(request)
+                    finally:
+                        queue.task_done()
 
-        # Add sentinel values to signal workers to stop
-        for _ in range(self.max_workers):
-            await queue.put(None)
+            # Start all worker tasks
+            workers = [asyncio.create_task(worker()) for _ in range(self.max_workers)]
 
-        # Consumer: Create worker tasks
-        workers = [asyncio.create_task(worker()) for _ in range(self.max_workers)]
-
-        # Wait for all tasks to complete
-        await queue.join()
-
-        # Wait for all workers to finish
-        await asyncio.gather(*workers)
+            # Wait for all tasks to complete
+            await queue.join()
+            await asyncio.gather(*workers)
 
         return results
+
+    async def _execute_single_async(
+        self,
+        session: aiohttp.ClientSession,
+        request: Dict[str, Any]
+    ) -> tuple[str, Dict[str, Any]]:
+        """
+        Execute a single request with retry logic.
+
+        Args:
+            session: aiohttp session
+            request: Request dictionary with custom_id, model, messages, etc.
+
+        Returns:
+            (custom_id, response_dict)
+        """
+        custom_id = request["custom_id"]
+        model = request["model"]
+
+        # Route to appropriate API based on model
+        if model in self.GPT5_MODELS:
+            return await self._execute_gpt5_async(session, request)
+        else:
+            return await self._execute_chat_async(session, request)
+
+    async def _execute_chat_async(
+        self,
+        session: aiohttp.ClientSession,
+        request: Dict[str, Any]
+    ) -> tuple[str, Dict[str, Any]]:
+        """Execute request using chat completions API (GPT-4, etc.)."""
+        custom_id = request["custom_id"]
+        model = request["model"]
+        messages = request["messages"]
+        max_tokens = request.get("max_tokens", 100)
+        temperature = request.get("temperature", 1.0)
+        response_format = request.get("response_format")
+
+        # Build request payload
+        payload = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens
+        }
+
+        # Add temperature only for non-reasoning models
+        if model not in self.REASONING_MODELS:
+            payload["temperature"] = temperature
+
+        # Add structured output if supported
+        if response_format and model in self.STRUCTURED_OUTPUT_MODELS:
+            payload["response_format"] = response_format
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        # Retry loop
+        for attempt in range(self.max_retries):
+            try:
+                async with session.post(
+                    self.chat_url,
+                    json=payload,
+                    headers=headers
+                ) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+
+                    # Extract content
+                    content = data["choices"][0]["message"]["content"]
+
+                    # Try to parse as JSON if needed
+                    if response_format:
+                        try:
+                            # Native structured output or markdown-wrapped JSON
+                            if "```json" in content:
+                                content = content.split("```json")[1].split("```")[0].strip()
+                            elif "```" in content:
+                                content = content.split("```")[1].split("```")[0].strip()
+
+                            parsed = json.loads(content)
+                            return (custom_id, parsed)
+                        except (json.JSONDecodeError, ValueError):
+                            # Return raw content if JSON parsing fails
+                            return (custom_id, {"content": content})
+                    else:
+                        # Simple text response
+                        return (custom_id, {"content": content})
+
+            except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+                # Retryable errors
+                if attempt < self.max_retries - 1:
+                    wait_time = (2 ** attempt) + (time.time() % 1)
+                    await asyncio.sleep(wait_time)
+                else:
+                    return (custom_id, {
+                        "status": "error",
+                        "error": f"Max retries exceeded: {str(e)}"
+                    })
+
+            except aiohttp.ClientResponseError as e:
+                # HTTP errors (rate limiting, server errors)
+                if e.status in [429, 500, 502, 503, 504] and attempt < self.max_retries - 1:
+                    wait_time = (2 ** attempt) + (time.time() % 1)
+                    await asyncio.sleep(wait_time)
+                else:
+                    return (custom_id, {
+                        "status": "error",
+                        "error": str(e)
+                    })
+
+            except Exception as e:
+                # Non-retryable errors
+                return (custom_id, {
+                    "status": "error",
+                    "error": str(e)
+                })
+
+        # Should never reach here, but just in case
+        return (custom_id, {
+            "status": "error",
+            "error": "Max retries exceeded"
+        })
+
+    async def _execute_gpt5_async(
+        self,
+        session: aiohttp.ClientSession,
+        request: Dict[str, Any]
+    ) -> tuple[str, Dict[str, Any]]:
+        """Execute request using responses API (GPT-5 models)."""
+        custom_id = request["custom_id"]
+        model = request["model"]
+        messages = request["messages"]
+        max_tokens = request.get("max_tokens", 100)
+        response_format = request.get("response_format")
+
+        # Convert messages to input format for responses API
+        # Combine all messages into structured input array
+        input_messages = []
+        for msg in messages:
+            input_messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+
+        # If we need JSON output, add instruction to the last user message
+        if response_format:
+            # Extract field names from schema if available
+            field_names = []
+            if isinstance(response_format, dict) and "json_schema" in response_format:
+                schema = response_format["json_schema"].get("schema", {})
+                properties = schema.get("properties", {})
+                field_names = list(properties.keys())
+
+            # Add JSON instruction to help GPT-5 understand we need JSON with specific fields
+            if input_messages and input_messages[-1]["role"] == "user":
+                if field_names:
+                    fields_str = ", ".join([f'"{field}"' for field in field_names])
+                    input_messages[-1]["content"] += f"\n\nIMPORTANT: Respond with ONLY valid JSON containing these exact fields: {fields_str}. No markdown formatting, no explanation, just the JSON object."
+                else:
+                    input_messages[-1]["content"] += "\n\nIMPORTANT: Respond with ONLY valid JSON matching the required schema. No markdown formatting, no explanation, just the JSON object."
+
+        # Build request payload for responses API
+        payload = {
+            "model": model,
+            "input": input_messages
+        }
+
+        # GPT-5 uses reasoning effort instead of max_tokens for output control
+        # We'll use a minimal reasoning effort for faster responses
+        # Note: max_output_tokens controls the actual output length
+        if max_tokens:
+            payload["max_output_tokens"] = max(max_tokens * 3, 300)  # GPT-5 needs more headroom
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        # Retry loop
+        for attempt in range(self.max_retries):
+            try:
+                async with session.post(
+                    self.responses_url,
+                    json=payload,
+                    headers=headers
+                ) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+
+                    # Extract output from responses API
+                    # Response format: {
+                    #   "output": [{
+                    #     "type": "message",
+                    #     "content": [{"type": "output_text", "text": "..."}]
+                    #   }]
+                    # }
+                    if "output" in data and len(data["output"]) > 0:
+                        # Navigate: output[0] -> content[0] -> text
+                        output_msg = data["output"][0]
+                        if "content" in output_msg and len(output_msg["content"]) > 0:
+                            output_text = output_msg["content"][0].get("text", "")
+                        else:
+                            output_text = ""
+
+                        # Try to parse as JSON if we expected structured output
+                        if response_format:
+                            try:
+                                # Clean up potential markdown wrapping
+                                content = output_text.strip()
+                                if "```json" in content:
+                                    content = content.split("```json")[1].split("```")[0].strip()
+                                elif "```" in content:
+                                    content = content.split("```")[1].split("```")[0].strip()
+
+                                parsed = json.loads(content)
+                                return (custom_id, parsed)
+                            except (json.JSONDecodeError, ValueError) as e:
+                                # Return raw content if JSON parsing fails
+                                return (custom_id, {"content": output_text})
+                        else:
+                            # Simple text response
+                            return (custom_id, {"content": output_text})
+                    else:
+                        # Unexpected response format
+                        return (custom_id, {
+                            "status": "error",
+                            "error": "Unexpected response format from GPT-5 API"
+                        })
+
+            except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+                # Retryable errors
+                if attempt < self.max_retries - 1:
+                    wait_time = (2 ** attempt) + (time.time() % 1)
+                    await asyncio.sleep(wait_time)
+                else:
+                    return (custom_id, {
+                        "status": "error",
+                        "error": f"Max retries exceeded: {str(e)}"
+                    })
+
+            except aiohttp.ClientResponseError as e:
+                # HTTP errors (rate limiting, server errors)
+                if e.status in [429, 500, 502, 503, 504] and attempt < self.max_retries - 1:
+                    wait_time = (2 ** attempt) + (time.time() % 1)
+                    await asyncio.sleep(wait_time)
+                else:
+                    return (custom_id, {
+                        "status": "error",
+                        "error": str(e)
+                    })
+
+            except Exception as e:
+                # Non-retryable errors
+                return (custom_id, {
+                    "status": "error",
+                    "error": str(e)
+                })
+
+        # Should never reach here, but just in case
+        return (custom_id, {
+            "status": "error",
+            "error": "Max retries exceeded"
+        })

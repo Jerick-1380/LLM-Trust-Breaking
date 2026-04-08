@@ -26,11 +26,14 @@ import re
 import time
 from tqdm import tqdm
 
+from src.llm.client_factory import is_openai_model
 from src.endogenous.core.prompt_builders import (
     build_stage1_prompt, build_stage1_schema,
     build_stage2_prompt, build_stage2_schema,
     build_stage3_prompt, build_stage3_schema,
     build_reflection_prompt, build_reflection_schema,
+    build_single_agent_reflection_prompt, build_single_agent_reflection_schema,
+    build_judge_prompt,
 )
 
 
@@ -51,6 +54,31 @@ def _supports_structured_output(llm_client: Any) -> bool:
         return llm_client.supports_structured_output
     model = llm_client.model
     return not _is_reasoning_model(model)
+
+
+def _model_supports_structured_output(model: str) -> bool:
+    """
+    Check if a specific model supports OpenAI structured output format.
+
+    Only OpenAI models (gpt-*, o1*, o3*) support the response_format JSON schema.
+    Claude/Anthropic models do not, even when routed through OpenRouter.
+    """
+    # Reasoning models don't support structured output
+    if _is_reasoning_model(model):
+        return False
+
+    # Claude/Anthropic models don't support OpenAI structured output
+    if "anthropic/" in model or "claude" in model.lower():
+        return False
+
+    # OpenAI models (with or without openai/ prefix)
+    if model.startswith("gpt-") or model.startswith("o1") or model.startswith("o3"):
+        return True
+    if model.startswith("openai/"):
+        return True
+
+    # Default: assume no structured output support
+    return False
 
 
 def _build_request(
@@ -83,13 +111,63 @@ def _build_request(
         request["temperature"] = temperature
         request["seed"] = 42
 
-    is_openai_native = (
-        model.startswith("gpt-") or model.startswith("o1") or model.startswith("o3")
-    )
-    if is_openai_native or (hasattr(llm_client, "supports_structured_output") and llm_client.supports_structured_output):
+    # Only add structured output for models that support it
+    # Must check the actual model being used, not llm_client.model
+    if _model_supports_structured_output(model):
         request["response_format"] = {"type": "json_schema", "json_schema": json_schema}
 
     return request
+
+
+def _execute_requests_split_by_provider(
+    requests: List[Dict[str, Any]],
+    queued_openai_client: Any,
+    queued_openrouter_client: Any,
+    progress_desc: str = "Processing"
+) -> Dict[str, Any]:
+    """
+    Execute requests by routing to appropriate provider based on model.
+
+    Splits requests into OpenAI (gpt-*, o1*, o3*) and OpenRouter (everything else),
+    executes them in parallel on separate queues, and merges results.
+
+    Args:
+        requests: List of request dicts with 'model' and 'custom_id' fields
+        queued_openai_client: QueuedOpenAIClient instance (or None)
+        queued_openrouter_client: QueuedOpenRouterClient instance (or None)
+        progress_desc: Description for progress bar
+
+    Returns:
+        Dictionary mapping custom_id to response
+    """
+    if not requests:
+        return {}
+
+    # Split requests by provider
+    openai_requests = []
+    openrouter_requests = []
+
+    for req in requests:
+        model = req.get("model", "")
+        if is_openai_model(model):
+            openai_requests.append(req)
+        else:
+            openrouter_requests.append(req)
+
+    # Execute on appropriate clients (in parallel if both providers needed)
+    results = {}
+
+    if openai_requests and queued_openai_client:
+        print(f"  → OpenAI: {len(openai_requests)} requests")
+        openai_results = queued_openai_client.execute_all(openai_requests)
+        results.update(openai_results)
+
+    if openrouter_requests and queued_openrouter_client:
+        print(f"  → OpenRouter: {len(openrouter_requests)} requests")
+        openrouter_results = queued_openrouter_client.execute_all(openrouter_requests)
+        results.update(openrouter_results)
+
+    return results
 
 
 def _parse_response(response: Any, action_fields: List[str]) -> Dict[str, Any]:
@@ -223,17 +301,24 @@ def _compute_outcomes(
     filtered = {k: v for k, v in game_params.items() if k in valid_keys}
     game = create_game(game_type, agent_names, **filtered)
 
-    # evaluate() expects Dict[str, str]; convert normalized actions
-    str_choices: Dict[str, str] = {}
+    # Parse actions through game's parse_action() to get internal representation
+    # (e.g., volunteer game converts YES/NO to COOPERATE/DEFECT)
+    parsed_choices: Dict[str, str] = {}
     for a in agent_names:
         c = choices.get(a)
-        str_choices[a] = str(c) if c is not None else "0"
+        if c is not None:
+            # Create a mock LLM response dict for parse_action
+            mock_response = {"choice": c}
+            parsed = game.parse_action(a, mock_response)
+            parsed_choices[a] = str(parsed)
+        else:
+            parsed_choices[a] = "0"
 
-    payoffs = game.evaluate(str_choices)
+    payoffs = game.evaluate(parsed_choices)
 
     # Build a short description line from the payoffs
     payoff_parts = ", ".join(f"{a}: {payoffs.get(a, 0.0):.1f}" for a in agent_names)
-    choice_parts = ", ".join(f"{a}: {str_choices[a]}" for a in agent_names)
+    choice_parts = ", ".join(f"{a}: {choices.get(a, 'None')}" for a in agent_names)
     description = f"Actions — {choice_parts}. Payoffs — {payoff_parts}."
 
     return {
@@ -256,6 +341,7 @@ def _run_stage1(
     parallel_client: Any,
     supports_structured: bool,
     takeaways_by_agent: Optional[Dict[str, Dict[str, str]]] = None,
+    agent_models: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
     Fire Stage 1 for all agents in parallel and return parsed results.
@@ -269,23 +355,27 @@ def _run_stage1(
     """
     requests = []
     for agent_name in agent_names:
+        # Determine model and structured output support for this specific agent
+        agent_model = agent_models[agent_name] if agent_models else llm_client.model
+        agent_supports_structured = _model_supports_structured_output(agent_model)
+
         agent_takeaways = (takeaways_by_agent or {}).get(agent_name)
         system_p, user_p, schema = build_stage1_prompt(
             game_type=game_type,
             agent_name=agent_name,
             agent_names=agent_names,
             game_params=game_params,
-            supports_structured=supports_structured,
+            supports_structured=agent_supports_structured,
             takeaways=agent_takeaways,
         )
         req = _build_request(
             custom_id=f"t{trial_id}_s1_{agent_name}",
-            model=llm_client.model,
+            model=agent_model,
             system_prompt=system_p,
             user_prompt=user_p,
             json_schema=schema,
             temperature=llm_client.temperature,
-            supports_structured=supports_structured,
+            supports_structured=agent_supports_structured,
             llm_client=llm_client,
         )
         requests.append((agent_name, req))
@@ -316,6 +406,7 @@ def _run_stage2(
     supports_structured: bool,
     round_robin: bool = False,
     announcement_order: Optional[List[str]] = None,
+    agent_models: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
     Fire Stage 2 for all agents.
@@ -338,23 +429,27 @@ def _run_stage2(
         # Simultaneous: fire all in parallel
         requests = []
         for agent_name in order:
+            # Determine model and structured output support for this specific agent
+            agent_model = agent_models[agent_name] if agent_models else llm_client.model
+            agent_supports_structured = _model_supports_structured_output(agent_model)
+
             system_p, user_p, schema = build_stage2_prompt(
                 game_type=game_type,
                 agent_name=agent_name,
                 agent_names=agent_names,
                 stage1_result=stage1_results.get(agent_name, {}),
                 game_params=game_params,
-                supports_structured=supports_structured,
+                supports_structured=agent_supports_structured,
                 prior_announcements=None,
             )
             req = _build_request(
                 custom_id=f"t{trial_id}_s2_{agent_name}",
-                model=llm_client.model,
+                model=agent_model,
                 system_prompt=system_p,
                 user_prompt=user_p,
                 json_schema=schema,
                 temperature=llm_client.temperature,
-                supports_structured=supports_structured,
+                supports_structured=agent_supports_structured,
                 llm_client=llm_client,
             )
             requests.append((agent_name, req))
@@ -378,6 +473,10 @@ def _run_stage2(
         # Round-robin: sequential — each agent sees all prior announcements
         results = {}
         for pos, agent_name in enumerate(order):
+            # Determine model and structured output support for this specific agent
+            agent_model = agent_models[agent_name] if agent_models else llm_client.model
+            agent_supports_structured = _model_supports_structured_output(agent_model)
+
             prior = [
                 {
                     "name":          prev,
@@ -392,17 +491,17 @@ def _run_stage2(
                 agent_names=agent_names,
                 stage1_result=stage1_results.get(agent_name, {}),
                 game_params=game_params,
-                supports_structured=supports_structured,
+                supports_structured=agent_supports_structured,
                 prior_announcements=prior,
             )
             req = _build_request(
                 custom_id=f"t{trial_id}_s2_{agent_name}",
-                model=llm_client.model,
+                model=agent_model,
                 system_prompt=system_p,
                 user_prompt=user_p,
                 json_schema=schema,
                 temperature=llm_client.temperature,
-                supports_structured=supports_structured,
+                supports_structured=agent_supports_structured,
                 llm_client=llm_client,
             )
             # Fire one request synchronously via the parallel client
@@ -430,6 +529,7 @@ def _run_stage3(
     parallel_client: Any,
     supports_structured: bool,
     self_reference: bool,
+    agent_models: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
     Fire Stage 3 for all agents in parallel (each sees all Stage 2 messages).
@@ -439,6 +539,10 @@ def _run_stage3(
     """
     requests = []
     for agent_name in agent_names:
+        # Determine model and structured output support for this specific agent
+        agent_model = agent_models[agent_name] if agent_models else llm_client.model
+        agent_supports_structured = _model_supports_structured_output(agent_model)
+
         system_p, user_p, schema = build_stage3_prompt(
             game_type=game_type,
             agent_name=agent_name,
@@ -448,16 +552,16 @@ def _run_stage3(
             stage1_result=stage1_results.get(agent_name) if self_reference else None,
             stage2_self=stage2_results.get(agent_name) if self_reference else None,
             self_reference=self_reference,
-            supports_structured=supports_structured,
+            supports_structured=agent_supports_structured,
         )
         req = _build_request(
             custom_id=f"t{trial_id}_s3_{agent_name}",
-            model=llm_client.model,
+            model=agent_model,
             system_prompt=system_p,
             user_prompt=user_p,
             json_schema=schema,
             temperature=llm_client.temperature,
-            supports_structured=supports_structured,
+            supports_structured=agent_supports_structured,
             llm_client=llm_client,
         )
         requests.append((agent_name, req))
@@ -493,43 +597,153 @@ def _run_reflection(
     stage3_results: Dict[str, Dict[str, Any]],
     current_takeaways: Dict[str, Dict[str, str]],
     round_idx: int,
+    agent_models: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
-    Fire the reflection prompt for all agents in parallel.
+    Fire granular reflection prompts: one prompt per (focal_agent, target_agent) pair.
+
+    For N agents, this creates N × (N-1) reflection requests.
 
     Args:
         stage2_results:     agent_name -> stage2 dict for this trial
         stage3_results:     agent_name -> stage3 dict for this trial
-        current_takeaways:  agent_name -> {other_agent -> takeaway str}
+        current_takeaways:  agent_name -> {other_agent -> takeaway dict}
 
     Returns:
-        Dict[agent_name -> {"takeaways": {other_agent: str}, "_parse_ok": bool}]
+        Dict[agent_name -> {"takeaways": {other_agent: {"score": int, "assessment": str}}, "_parse_ok": bool}]
     """
     choices = {a: stage3_results[a].get("choice") for a in agent_names}
     outcomes = _compute_outcomes(game_type, agent_names, game_params, choices)
 
+    # Build one request per (focal_agent, target_agent) pair
     requests = []
     for agent_name in agent_names:
-        system_p, user_p, schema = build_reflection_prompt(
-            game_type=game_type,
+        # Determine model and structured output support for this specific agent
+        agent_model = agent_models[agent_name] if agent_models else llm_client.model
+        agent_supports_structured = _model_supports_structured_output(agent_model)
+
+        other_agents = [a for a in agent_names if a != agent_name]
+
+        for target_agent in other_agents:
+            system_p, user_p, schema = build_single_agent_reflection_prompt(
+                game_type=game_type,
+                agent_name=agent_name,
+                target_agent=target_agent,
+                agent_names=agent_names,
+                game_params=game_params,
+                stage2_results=stage2_results,
+                outcomes=outcomes,
+                current_takeaways=current_takeaways.get(agent_name, {}),
+                round_idx=round_idx,
+                supports_structured=agent_supports_structured,
+            )
+            req = _build_request(
+                custom_id=f"t{trial_id}_refl_{agent_name}_about_{target_agent}",
+                model=agent_model,
+                system_prompt=system_p,
+                user_prompt=user_p,
+                json_schema=schema,
+                temperature=llm_client.temperature,
+                supports_structured=agent_supports_structured,
+                llm_client=llm_client,
+            )
+            requests.append((agent_name, target_agent, req))
+
+    # Execute all requests in parallel
+    raw = parallel_client.execute_parallel([r for _, _, r in requests])
+
+    # Aggregate results by focal agent
+    results = {agent: {"takeaways": {}, "_parse_ok": True, "outcomes": outcomes} for agent in agent_names}
+
+    for agent_name, target_agent, req in requests:
+        cid = req["custom_id"]
+        parsed = _parse_response(raw.get(cid, {}), ["score", "assessment"])
+
+        score = parsed.get("score")
+        assessment = parsed.get("assessment", "")
+
+        # Store the result
+        if score is not None and assessment:
+            results[agent_name]["takeaways"][target_agent] = {
+                "score": score,
+                "assessment": assessment
+            }
+        else:
+            # Parse failure for this specific target
+            results[agent_name]["_parse_ok"] = False
+            results[agent_name]["takeaways"][target_agent] = {}
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Judge executor  (LLM-as-judge, always uses openai/gpt-5-mini)
+# ---------------------------------------------------------------------------
+
+def _build_judge_request(
+    custom_id: str,
+    agent_name: str,
+    agent_names: List[str],
+    stage1_result: Dict[str, Any],
+    stage2_self: Dict[str, Any],
+    stage2_all: Dict[str, Dict[str, Any]],
+    stage3_result: Dict[str, Any],
+    llm_client: Any,
+    supports_structured: bool,
+) -> Dict[str, Any]:
+    """Build a single judge API request dict (always uses openai/gpt-5-mini)."""
+    sys_p, usr_p, schema = build_judge_prompt(
+        agent_name=agent_name,
+        agent_names=agent_names,
+        stage1_result=stage1_result,
+        stage2_self=stage2_self,
+        stage2_all=stage2_all,
+        stage3_result=stage3_result,
+    )
+    req = _build_request(
+        custom_id=custom_id,
+        model="openai/gpt-5-mini",
+        system_prompt=sys_p,
+        user_prompt=usr_p,
+        json_schema=schema,
+        temperature=llm_client.temperature,
+        supports_structured=supports_structured,
+        llm_client=llm_client,
+    )
+    req["max_tokens"] = 200
+    return req
+
+
+def _run_judge(
+    trial_id: int,
+    agent_names: List[str],
+    stage1_results: Dict[str, Dict[str, Any]],
+    stage2_results: Dict[str, Dict[str, Any]],
+    stage3_results: Dict[str, Dict[str, Any]],
+    parallel_client: Any,
+    llm_client: Any,
+    supports_structured: bool,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Fire the judge prompt for all agents in parallel (sequential runner).
+
+    Uses the same parallel_client and model as the main agent stages.
+
+    Returns:
+        Dict[agent_name -> {"primary_label": str, "confidence": int, "_parse_ok": bool}]
+    """
+    requests = []
+    for agent_name in agent_names:
+        req = _build_judge_request(
+            custom_id=f"t{trial_id}_judge_{agent_name}",
             agent_name=agent_name,
             agent_names=agent_names,
-            game_params=game_params,
-            stage2_results=stage2_results,
-            outcomes=outcomes,
-            current_takeaways=current_takeaways.get(agent_name, {}),
-            round_idx=round_idx,
-            supports_structured=supports_structured,
-        )
-        req = _build_request(
-            custom_id=f"t{trial_id}_refl_{agent_name}",
-            model=llm_client.model,
-            system_prompt=system_p,
-            user_prompt=user_p,
-            json_schema=schema,
-            temperature=llm_client.temperature,
-            supports_structured=supports_structured,
+            stage1_result=stage1_results.get(agent_name, {}),
+            stage2_self=stage2_results.get(agent_name, {}),
+            stage2_all=stage2_results,
+            stage3_result=stage3_results.get(agent_name, {}),
             llm_client=llm_client,
+            supports_structured=supports_structured,
         )
         requests.append((agent_name, req))
 
@@ -538,15 +752,12 @@ def _run_reflection(
     results = {}
     for agent_name, req in requests:
         cid = req["custom_id"]
-        parsed = _parse_response(raw.get(cid, {}), ["takeaways"])
-        raw_takeaways = parsed.get("takeaways", {})
-        # Ensure it's a dict; fall back gracefully
-        if not isinstance(raw_takeaways, dict):
-            raw_takeaways = {}
+        parsed = _parse_response(raw.get(cid, {}), ["primary_label", "confidence"])
+        label = parsed.get("primary_label", "")
         results[agent_name] = {
-            "takeaways": raw_takeaways,
-            "outcomes":  outcomes,
-            "_parse_ok": bool(raw_takeaways),
+            "primary_label": label if label else "Inconsistency / Error",
+            "confidence":    parsed.get("confidence", 1),
+            "_parse_ok":     bool(label),
         }
     return results
 
@@ -568,25 +779,26 @@ def run_trial(
     takeaways_by_agent: Optional[Dict[str, Dict[str, str]]] = None,
     round_idx: int = 0,
     run_reflection: bool = False,
+    agent_models: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Run a single three-stage trial, optionally followed by a reflection step.
 
     Stages execute strictly in order:
-      Stage 1 → Stage 2 → Stage 3 [→ Reflection]
+      Stage 1 → Stage 2 → Stage 3 → Judge [→ Reflection]
 
     Args:
-        round_robin:         if True, Stage 2 agents announce sequentially
-        announcement_order:  order of agents in round-robin Stage 2
-        takeaways_by_agent:  per-agent takeaways from prior rounds
-                             (injected into Stage 1 system prompt)
-        round_idx:           current round index (0-based; used in reflection prompt)
-        run_reflection:      if True, fire reflection after Stage 3 and
-                             include reflection output in the result
+        round_robin:        if True, Stage 2 agents announce sequentially
+        announcement_order: order of agents in round-robin Stage 2
+        takeaways_by_agent: per-agent takeaways from prior rounds
+                            (injected into Stage 1 system prompt)
+        round_idx:          current round index (0-based; used in reflection prompt)
+        run_reflection:     if True, fire reflection after Stage 3 and
+                            include reflection output in the result
 
     Returns a dict with:
-      trial_id, round_id, agents (per-agent stage outputs + deception measures + typology),
-      outcomes, announcement_order, _parse_errors
+      trial_id, round_id, agents (per-agent stage outputs + deception measures + typology
+      + judge classification), outcomes, announcement_order, _parse_errors
     """
     supports_structured = _supports_structured_output(llm_client)
     order = announcement_order if announcement_order is not None else list(agent_names)
@@ -596,6 +808,7 @@ def run_trial(
         trial_id, game_type, agent_names, game_params,
         llm_client, parallel_client, supports_structured,
         takeaways_by_agent=takeaways_by_agent,
+        agent_models=agent_models,
     )
 
     # Stage 2: public announcement (sees own Stage 1 output)
@@ -604,12 +817,22 @@ def run_trial(
         llm_client, parallel_client, supports_structured,
         round_robin=round_robin,
         announcement_order=order,
+        agent_models=agent_models,
     )
 
     # Stage 3: action selection (sees all Stage 2 messages)
     stage3 = _run_stage3(
         trial_id, game_type, agent_names, stage1, stage2, game_params,
         llm_client, parallel_client, supports_structured, self_reference,
+        agent_models=agent_models,
+    )
+
+    # Judge: LLM-as-judge classification — uses same client/model as agents
+    judge = _run_judge(
+        trial_id, agent_names, stage1, stage2, stage3,
+        parallel_client=parallel_client,
+        llm_client=llm_client,
+        supports_structured=supports_structured,
     )
 
     # Compute deception measures per agent
@@ -645,6 +868,7 @@ def run_trial(
         if "prior_seen" in s2:
             stage2_entry["prior_seen"] = s2["prior_seen"]
 
+        j = judge.get(agent_name, {})
         agent_data[agent_name] = {
             "stage1": {
                 "intended_action": plan,
@@ -660,6 +884,11 @@ def run_trial(
             "promise_deception":   promise_deception,
             "commitment_breaking": commitment_breaking,
             "typology":            typology_label,
+            "judge": {
+                "primary_label": j.get("primary_label", "Inconsistency / Error"),
+                "confidence":    j.get("confidence", 1),
+                "_parse_ok":     j.get("_parse_ok", False),
+            },
         }
 
     # Compute outcomes (needed for reflection and stored on result)
@@ -685,6 +914,7 @@ def run_trial(
             stage3_results=stage3,
             current_takeaways=takeaways_by_agent or {},
             round_idx=round_idx,
+            agent_models=agent_models,
         )
         for agent_name in agent_names:
             result["agents"][agent_name]["reflection"] = {
@@ -710,6 +940,7 @@ def run_all_trials(
     self_reference: bool = True,
     round_robin: bool = False,
     show_progress: bool = True,
+    agent_models: Optional[Dict[str, str]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Run n_trials independent game instances for n_rounds, collecting all results.
@@ -776,6 +1007,7 @@ def run_all_trials(
                 takeaways_by_agent=current_takeaways[trial_id],
                 round_idx=round_idx,
                 run_reflection=do_reflect,
+                agent_models=agent_models,
             )
             round_results.append(result)
 
@@ -817,11 +1049,12 @@ def _assemble_trial_results(
     stage3_all: Dict[str, Dict[str, Any]],
     game_type: str,
     game_params: Optional[Dict[str, Any]] = None,
+    judge_all: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Combine stage results for all trials into the standard trial-result format.
 
-    stage1_all / stage2_all / stage3_all are keyed by "{trial_id}_{agent_name}".
+    stage1_all / stage2_all / stage3_all / judge_all are keyed by "{trial_id}_{agent_name}".
     """
     trials = []
     for trial_id in trial_ids:
@@ -832,6 +1065,7 @@ def _assemble_trial_results(
             s1 = stage1_all.get(key, {})
             s2 = stage2_all.get(key, {})
             s3 = stage3_all.get(key, {})
+            j  = (judge_all or {}).get(key, {})
 
             plan    = s1.get("intended_action")
             promise = s2.get("stated_action")
@@ -871,6 +1105,11 @@ def _assemble_trial_results(
                 "promise_deception":   promise_deception,
                 "commitment_breaking": commitment_breaking,
                 "typology":            typology_label,
+                "judge": {
+                    "primary_label": j.get("primary_label", "Inconsistency / Error"),
+                    "confidence":    j.get("confidence", 1),
+                    "_parse_ok":     j.get("_parse_ok", False),
+                },
             }
 
         # Compute outcomes for this trial (stored at trial level)
@@ -891,12 +1130,15 @@ def run_all_trials_queued(
     agent_names: List[str],
     game_params: Dict[str, Any],
     llm_client: Any,
-    queued_client: Any,
+    queued_client: Any = None,  # Legacy parameter (kept for compatibility)
     n_trials: int = 50,
     n_rounds: int = 1,
     self_reference: bool = True,
     round_robin: bool = False,
     show_progress: bool = True,
+    agent_models: Optional[Dict[str, str]] = None,
+    queued_openai_client: Any = None,
+    queued_openrouter_client: Any = None,
 ) -> List[Dict[str, Any]]:
     """
     Run all trials using the queue-based async client for maximum throughput.
@@ -906,7 +1148,8 @@ def run_all_trials_queued(
       Stage 2:       n_trials × n_agents requests  (or n_agents sequential pos batches
                      of n_trials each, if round_robin=True)
       Stage 3:       n_trials × n_agents requests
-      Reflection:    n_trials × n_agents requests  (skipped for the final round)
+      Judge:         n_trials × n_agents requests  (always openai/gpt-5-mini)
+      Reflection:    n_trials × n_agents requests  (only when n_rounds > 1)
 
     Each trial maintains independent takeaways across rounds (Option A).
 
@@ -921,10 +1164,17 @@ def run_all_trials_queued(
         self_reference:  include own Stage 1/2 context in Stage 3 prompt
         round_robin:     if True, Stage 2 is sequential per-position across trials
         show_progress:   display tqdm progress bars
+        agent_models:    optional dict mapping agent_name -> fully-qualified model string
+                         (e.g., {"J": "openai/gpt-5-mini", "M": "anthropic/claude-sonnet-4.6"})
+                         Falls back to llm_client.model if None or agent not in dict
 
     Returns:
         List of round dicts: [{"round_id": int, "trials": [trial_result, ...]}, ...]
     """
+    # Legacy fallback: if queued_client is provided but not the split clients, use it for OpenRouter
+    if queued_client is not None and queued_openrouter_client is None:
+        queued_openrouter_client = queued_client
+
     n_agents = len(agent_names)
     trial_ids = list(range(n_trials))
     supports_structured = _supports_structured_output(llm_client)
@@ -971,33 +1221,34 @@ def run_all_trials_queued(
         s1_requests = []
         for trial_id in trial_ids:
             for agent_name in agent_names:
+                # Determine model and structured output support for this specific agent
+                agent_model = agent_models[agent_name] if agent_models else llm_client.model
+                agent_supports_structured = _model_supports_structured_output(agent_model)
+
                 sys_p, usr_p, schema = build_stage1_prompt(
                     game_type=game_type,
                     agent_name=agent_name,
                     agent_names=agent_names,
                     game_params=game_params,
-                    supports_structured=supports_structured,
+                    supports_structured=agent_supports_structured,
                     takeaways=current_takeaways[trial_id][agent_name],
                 )
                 req = _build_request(
                     custom_id=f"r{round_idx}_t{trial_id}_s1_{agent_name}",
-                    model=llm_client.model,
+                    model=agent_model,
                     system_prompt=sys_p,
                     user_prompt=usr_p,
                     json_schema=schema,
                     temperature=llm_client.temperature,
-                    supports_structured=supports_structured,
+                    supports_structured=agent_supports_structured,
                     llm_client=llm_client,
                 )
                 s1_requests.append(req)
 
-        if show_progress:
-            pb1 = tqdm(total=len(s1_requests), desc="    Stage 1", unit="req")
-            def cb1(d, t, pb=pb1): pb.update(1)
-        else:
-            cb1 = None
-        s1_raw = queued_client.execute_all(s1_requests, progress_callback=cb1)
-        if show_progress: pb1.close()
+        print(f"\n  Stage 1: {len(s1_requests)} requests")
+        s1_raw = _execute_requests_split_by_provider(
+            s1_requests, queued_openai_client, queued_openrouter_client, "Stage 1"
+        )
 
         stage1_parsed: Dict[str, Dict[str, Any]] = {}
         for trial_id in trial_ids:
@@ -1019,6 +1270,10 @@ def run_all_trials_queued(
             s2_requests = []
             for trial_id in trial_ids:
                 for agent_name in agent_names:
+                    # Determine model and structured output support for this specific agent
+                    agent_model = agent_models[agent_name] if agent_models else llm_client.model
+                    agent_supports_structured = _model_supports_structured_output(agent_model)
+
                     s1_result = stage1_parsed.get(f"{trial_id}_{agent_name}", {})
                     sys_p, usr_p, schema = build_stage2_prompt(
                         game_type=game_type,
@@ -1026,28 +1281,25 @@ def run_all_trials_queued(
                         agent_names=agent_names,
                         stage1_result=s1_result,
                         game_params=game_params,
-                        supports_structured=supports_structured,
+                        supports_structured=agent_supports_structured,
                         prior_announcements=None,
                     )
                     req = _build_request(
                         custom_id=f"r{round_idx}_t{trial_id}_s2_{agent_name}",
-                        model=llm_client.model,
+                        model=agent_model,
                         system_prompt=sys_p,
                         user_prompt=usr_p,
                         json_schema=schema,
                         temperature=llm_client.temperature,
-                        supports_structured=supports_structured,
+                        supports_structured=agent_supports_structured,
                         llm_client=llm_client,
                     )
                     s2_requests.append(req)
 
-            if show_progress:
-                pb2 = tqdm(total=len(s2_requests), desc="    Stage 2", unit="req")
-                def cb2(d, t, pb=pb2): pb.update(1)
-            else:
-                cb2 = None
-            s2_raw = queued_client.execute_all(s2_requests, progress_callback=cb2)
-            if show_progress: pb2.close()
+            print(f"\n  Stage 2 (simultaneous): {len(s2_requests)} requests")
+            s2_raw = _execute_requests_split_by_provider(
+                s2_requests, queued_openai_client, queued_openrouter_client, "Stage 2"
+            )
 
             for trial_id in trial_ids:
                 for pos, agent_name in enumerate(announcement_order):
@@ -1064,6 +1316,10 @@ def run_all_trials_queued(
         else:
             print(f"  Stage 2 [round-robin]: {n_agents} positions × {n_trials} trials...")
             for pos, agent_name in enumerate(announcement_order):
+                # Determine model and structured output support for this specific agent
+                agent_model = agent_models[agent_name] if agent_models else llm_client.model
+                agent_supports_structured = _model_supports_structured_output(agent_model)
+
                 position_requests = []
                 for trial_id in trial_ids:
                     prior = [
@@ -1081,29 +1337,25 @@ def run_all_trials_queued(
                         agent_names=agent_names,
                         stage1_result=s1_result,
                         game_params=game_params,
-                        supports_structured=supports_structured,
+                        supports_structured=agent_supports_structured,
                         prior_announcements=prior,
                     )
                     req = _build_request(
                         custom_id=f"r{round_idx}_t{trial_id}_s2_{agent_name}",
-                        model=llm_client.model,
+                        model=agent_model,
                         system_prompt=sys_p,
                         user_prompt=usr_p,
                         json_schema=schema,
                         temperature=llm_client.temperature,
-                        supports_structured=supports_structured,
+                        supports_structured=agent_supports_structured,
                         llm_client=llm_client,
                     )
                     position_requests.append(req)
 
-                desc = f"    Stage 2 pos {pos} ({agent_name})"
-                if show_progress:
-                    pb_pos = tqdm(total=len(position_requests), desc=desc, unit="req")
-                    def cb_pos(d, t, pb=pb_pos): pb.update(1)
-                else:
-                    cb_pos = None
-                pos_raw = queued_client.execute_all(position_requests, progress_callback=cb_pos)
-                if show_progress: pb_pos.close()
+                print(f"\n  Stage 2 (round-robin) pos {pos} ({agent_name}): {len(position_requests)} requests")
+                pos_raw = _execute_requests_split_by_provider(
+                    position_requests, queued_openai_client, queued_openrouter_client, f"Stage 2 pos {pos}"
+                )
 
                 for trial_id in trial_ids:
                     cid = f"r{round_idx}_t{trial_id}_s2_{agent_name}"
@@ -1123,6 +1375,10 @@ def run_all_trials_queued(
         for trial_id in trial_ids:
             stage2_trial = {a: stage2_parsed[f"{trial_id}_{a}"] for a in agent_names}
             for agent_name in agent_names:
+                # Determine model and structured output support for this specific agent
+                agent_model = agent_models[agent_name] if agent_models else llm_client.model
+                agent_supports_structured = _model_supports_structured_output(agent_model)
+
                 s1_self = stage1_parsed.get(f"{trial_id}_{agent_name}") if self_reference else None
                 s2_self = stage2_parsed.get(f"{trial_id}_{agent_name}") if self_reference else None
                 sys_p, usr_p, schema = build_stage3_prompt(
@@ -1134,27 +1390,24 @@ def run_all_trials_queued(
                     stage1_result=s1_self,
                     stage2_self=s2_self,
                     self_reference=self_reference,
-                    supports_structured=supports_structured,
+                    supports_structured=agent_supports_structured,
                 )
                 req = _build_request(
                     custom_id=f"r{round_idx}_t{trial_id}_s3_{agent_name}",
-                    model=llm_client.model,
+                    model=agent_model,
                     system_prompt=sys_p,
                     user_prompt=usr_p,
                     json_schema=schema,
                     temperature=llm_client.temperature,
-                    supports_structured=supports_structured,
+                    supports_structured=agent_supports_structured,
                     llm_client=llm_client,
                 )
                 s3_requests.append(req)
 
-        if show_progress:
-            pb3 = tqdm(total=len(s3_requests), desc="    Stage 3", unit="req")
-            def cb3(d, t, pb=pb3): pb.update(1)
-        else:
-            cb3 = None
-        s3_raw = queued_client.execute_all(s3_requests, progress_callback=cb3)
-        if show_progress: pb3.close()
+        print(f"\n  Stage 3: {len(s3_requests)} requests")
+        s3_raw = _execute_requests_split_by_provider(
+            s3_requests, queued_openai_client, queued_openrouter_client, "Stage 3"
+        )
 
         stage3_parsed: Dict[str, Dict[str, Any]] = {}
         for trial_id in trial_ids:
@@ -1168,11 +1421,50 @@ def run_all_trials_queued(
                     "_parse_ok": action is not None,
                 }
 
+        # ---- Judge batch (LLM-as-judge, same model/client as agents) ----
+        print(f"  Judge: {n_trials * n_agents} classification requests...")
+        judge_requests = []
+        for trial_id in trial_ids:
+            for agent_name in agent_names:
+                req = _build_judge_request(
+                    custom_id=f"r{round_idx}_t{trial_id}_judge_{agent_name}",
+                    agent_name=agent_name,
+                    agent_names=agent_names,
+                    stage1_result=stage1_parsed.get(f"{trial_id}_{agent_name}", {}),
+                    stage2_self=stage2_parsed.get(f"{trial_id}_{agent_name}", {}),
+                    stage2_all={
+                        a: stage2_parsed.get(f"{trial_id}_{a}", {})
+                        for a in agent_names
+                    },
+                    stage3_result=stage3_parsed.get(f"{trial_id}_{agent_name}", {}),
+                    llm_client=llm_client,
+                    supports_structured=supports_structured,
+                )
+                judge_requests.append(req)
+
+        print(f"\n  Judge: {len(judge_requests)} requests")
+        judge_raw = _execute_requests_split_by_provider(
+            judge_requests, queued_openai_client, queued_openrouter_client, "Judge"
+        )
+
+        judge_parsed: Dict[str, Dict[str, Any]] = {}
+        for trial_id in trial_ids:
+            for agent_name in agent_names:
+                cid = f"r{round_idx}_t{trial_id}_judge_{agent_name}"
+                parsed = _parse_response(judge_raw.get(cid, {}), ["primary_label", "confidence"])
+                label = parsed.get("primary_label", "")
+                judge_parsed[f"{trial_id}_{agent_name}"] = {
+                    "primary_label": label if label else "Inconsistency / Error",
+                    "confidence":    parsed.get("confidence", 1),
+                    "_parse_ok":     bool(label),
+                }
+
         # ---- Assemble trial results ----
         round_results = _assemble_trial_results(
             trial_ids, agent_names,
             stage1_parsed, stage2_parsed, stage3_parsed,
             game_type, game_params,
+            judge_all=judge_parsed,
         )
         for t in round_results:
             t["round_id"] = round_idx
@@ -1180,63 +1472,97 @@ def run_all_trials_queued(
                 t["announcement_order"] = announcement_order
 
         # ---- Reflection (all rounds except last) ----
+        # Granular reflections: n_trials × n_agents × (n_agents - 1) requests
         if do_reflect:
-            print(f"  Reflection: {n_trials * n_agents} takeaway-update requests...")
+            n_reflection_requests = n_trials * n_agents * (n_agents - 1)
+            print(f"  Reflection: {n_reflection_requests} granular takeaway-update requests...")
             refl_requests = []
+
+            # Build metadata for later aggregation
+            request_metadata = []  # List of (trial_id, agent_name, target_agent)
+
             for trial_id in trial_ids:
                 stage2_trial = {a: stage2_parsed[f"{trial_id}_{a}"] for a in agent_names}
                 choices = {a: stage3_parsed[f"{trial_id}_{a}"].get("choice") for a in agent_names}
                 outcomes = _compute_outcomes(game_type, agent_names, game_params, choices)
+
                 for agent_name in agent_names:
-                    sys_p, usr_p, schema = build_reflection_prompt(
-                        game_type=game_type,
-                        agent_name=agent_name,
-                        agent_names=agent_names,
-                        game_params=game_params,
-                        stage2_results=stage2_trial,
-                        outcomes=outcomes,
-                        current_takeaways=current_takeaways[trial_id][agent_name],
-                        round_idx=round_idx,
-                        supports_structured=supports_structured,
-                    )
-                    req = _build_request(
-                        custom_id=f"r{round_idx}_t{trial_id}_refl_{agent_name}",
-                        model=llm_client.model,
-                        system_prompt=sys_p,
-                        user_prompt=usr_p,
-                        json_schema=schema,
-                        temperature=llm_client.temperature,
-                        supports_structured=supports_structured,
-                        llm_client=llm_client,
-                    )
-                    refl_requests.append(req)
+                    # Determine model and structured output support for this specific agent
+                    agent_model = agent_models[agent_name] if agent_models else llm_client.model
+                    agent_supports_structured = _model_supports_structured_output(agent_model)
 
-            if show_progress:
-                pb_r = tqdm(total=len(refl_requests), desc="    Reflection", unit="req")
-                def cb_r(d, t, pb=pb_r): pb.update(1)
-            else:
-                cb_r = None
-            refl_raw = queued_client.execute_all(refl_requests, progress_callback=cb_r)
-            if show_progress: pb_r.close()
+                    other_agents = [a for a in agent_names if a != agent_name]
 
-            # Parse reflections and update takeaways + enrich trial results
+                    for target_agent in other_agents:
+                        sys_p, usr_p, schema = build_single_agent_reflection_prompt(
+                            game_type=game_type,
+                            agent_name=agent_name,
+                            target_agent=target_agent,
+                            agent_names=agent_names,
+                            game_params=game_params,
+                            stage2_results=stage2_trial,
+                            outcomes=outcomes,
+                            current_takeaways=current_takeaways[trial_id][agent_name],
+                            round_idx=round_idx,
+                            supports_structured=agent_supports_structured,
+                        )
+                        req = _build_request(
+                            custom_id=f"r{round_idx}_t{trial_id}_refl_{agent_name}_about_{target_agent}",
+                            model=agent_model,
+                            system_prompt=sys_p,
+                            user_prompt=usr_p,
+                            json_schema=schema,
+                            temperature=llm_client.temperature,
+                            supports_structured=agent_supports_structured,
+                            llm_client=llm_client,
+                        )
+                        refl_requests.append(req)
+                        request_metadata.append((trial_id, agent_name, target_agent))
+
+            print(f"\n  Reflection: {len(refl_requests)} requests")
+            refl_raw = _execute_requests_split_by_provider(
+                refl_requests, queued_openai_client, queued_openrouter_client, "Reflection"
+            )
+
+            # Parse granular reflections and aggregate by (trial_id, agent_name)
+            # Initialize storage for each (trial_id, agent_name)
+            aggregated_reflections = {
+                (tid, agent): {"takeaways": {}, "_parse_ok": True}
+                for tid in trial_ids
+                for agent in agent_names
+            }
+
+            for (trial_id, agent_name, target_agent) in request_metadata:
+                cid = f"r{round_idx}_t{trial_id}_refl_{agent_name}_about_{target_agent}"
+                parsed = _parse_response(refl_raw.get(cid, {}), ["score", "assessment"])
+
+                score = parsed.get("score")
+                assessment = parsed.get("assessment", "")
+
+                if score is not None and assessment:
+                    aggregated_reflections[(trial_id, agent_name)]["takeaways"][target_agent] = {
+                        "score": score,
+                        "assessment": assessment
+                    }
+                else:
+                    # Parse failure for this specific target
+                    aggregated_reflections[(trial_id, agent_name)]["_parse_ok"] = False
+                    aggregated_reflections[(trial_id, agent_name)]["takeaways"][target_agent] = {}
+
+            # Store aggregated reflections in trial results and update takeaways
             for trial_id in trial_ids:
                 t_result = round_results[trial_id]
-                choices = {a: stage3_parsed[f"{trial_id}_{a}"].get("choice") for a in agent_names}
-                outcomes = _compute_outcomes(game_type, agent_names, game_params, choices)
                 for agent_name in agent_names:
-                    cid = f"r{round_idx}_t{trial_id}_refl_{agent_name}"
-                    parsed = _parse_response(refl_raw.get(cid, {}), ["takeaways"])
-                    raw_tw = parsed.get("takeaways", {})
-                    if not isinstance(raw_tw, dict):
-                        raw_tw = {}
+                    refl_data = aggregated_reflections[(trial_id, agent_name)]
+
                     # Store reflection in trial result
                     t_result["agents"][agent_name]["reflection"] = {
-                        "takeaways": raw_tw,
-                        "_parse_ok": bool(raw_tw),
+                        "takeaways": refl_data["takeaways"],
+                        "_parse_ok": refl_data["_parse_ok"],
                     }
+
                     # Update takeaways for next round
-                    for other, val in raw_tw.items():
+                    for other, val in refl_data["takeaways"].items():
                         if other in current_takeaways[trial_id][agent_name]:
                             current_takeaways[trial_id][agent_name][other] = val
 

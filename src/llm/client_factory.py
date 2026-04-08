@@ -1,160 +1,155 @@
 """
-Factory for creating the appropriate LLM client based on model name.
+Factory for creating LLM clients.
 
-Automatically routes:
-- GPT models (gpt-*) → OpenAI API
-- O-series models (o1*, o3*) → OpenAI API
-- Claude models (claude-*, anthropic/*) → OpenRouter API
-- Everything else → OpenRouter API
+Routes model traffic to the appropriate provider:
+- OpenAI models (gpt-*, o1*, o3*) → OpenAI API directly
+- All other models (Claude, Llama, etc.) → OpenRouter
+
+Model names without a provider prefix are automatically normalised
+(e.g. "gpt-4o-mini" → "openai/gpt-4o-mini", "claude-3.5-sonnet" → "anthropic/claude-3.5-sonnet").
 """
 
 from typing import Tuple
 from src.llm.providers.openai_client import OpenAIClient
 from src.llm.providers.openrouter_client import OpenRouterClient
-from src.llm.providers.parallel_openai import ParallelLLMClient
 from src.llm.providers.parallel_openrouter_async import AsyncOpenRouterParallelClient
 
 
-def should_use_openai(model: str) -> bool:
+def is_openai_model(model: str) -> bool:
     """
-    Determine if a model should use OpenAI API (True) or OpenRouter (False).
+    Check if a model should use OpenAI API directly.
 
     Args:
-        model: Model identifier (e.g., "gpt-4o", "anthropic/claude-3.5-sonnet")
+        model: Model identifier (e.g., "gpt-4o-mini", "openai/gpt-5.2", "claude-3.5-sonnet")
 
     Returns:
-        True if should use OpenAI API, False if should use OpenRouter
+        True if model should route to OpenAI, False if it should use OpenRouter
 
     Examples:
-        >>> should_use_openai("gpt-4o")
+        >>> is_openai_model("gpt-4o-mini")
         True
-        >>> should_use_openai("gpt-4o-mini")
+        >>> is_openai_model("openai/gpt-5.2")
         True
-        >>> should_use_openai("o1-preview")
+        >>> is_openai_model("o1-mini")
         True
-        >>> should_use_openai("anthropic/claude-3.5-sonnet")
+        >>> is_openai_model("claude-3.5-sonnet")
         False
-        >>> should_use_openai("claude-3.5-sonnet")
+        >>> is_openai_model("meta-llama/llama-3.3-70b")
         False
-        >>> should_use_openai("openai/gpt-4o")
-        False  # OpenRouter prefix, use OpenRouter
     """
-    model_lower = model.lower()
+    # Remove provider prefix if present
+    base_model = model.split("/")[-1].lower()
 
-    # If model has openrouter prefix (provider/model), use OpenRouter
-    if '/' in model:
-        return False
-
-    # GPT models use OpenAI
-    if model_lower.startswith('gpt-'):
-        return True
-
-    # O-series models (o1, o3) use OpenAI
-    if model_lower.startswith('o1') or model_lower.startswith('o3'):
-        return True
-
-    # Everything else (Claude, Gemini, Llama, etc.) uses OpenRouter
-    return False
+    # Check if it's a GPT or o1/o3 model
+    return (base_model.startswith("gpt-") or
+            base_model.startswith("o1") or
+            base_model.startswith("o3"))
 
 
-def normalize_model_name(model: str, use_openai: bool) -> str:
+def normalize_model_name(model: str) -> str:
     """
-    Normalize model name for the appropriate API.
+    Normalise a model name for API routing.
 
-    Args:
-        model: Model identifier
-        use_openai: Whether using OpenAI API
-
-    Returns:
-        Normalized model name
+    If the name already contains a provider prefix (e.g. "openai/gpt-4o"),
+    it is returned unchanged.  Otherwise a prefix is inferred:
+      - gpt-*, o1*, o3*  → openai/<model>
+      - claude-*         → anthropic/<model>
+      - everything else  → returned as-is (OpenRouter will route it)
 
     Examples:
-        >>> normalize_model_name("gpt-4o", True)
-        "gpt-4o"
-        >>> normalize_model_name("anthropic/claude-3.5-sonnet", False)
-        "anthropic/claude-3.5-sonnet"
-        >>> normalize_model_name("claude-3.5-sonnet", False)
+        >>> normalize_model_name("gpt-4o-mini")
+        "openai/gpt-4o-mini"
+        >>> normalize_model_name("openai/gpt-4o")
+        "openai/gpt-4o"
+        >>> normalize_model_name("claude-3.5-sonnet")
         "anthropic/claude-3.5-sonnet"
     """
-    # If using OpenRouter and model doesn't have provider prefix, add it
-    if not use_openai and '/' not in model:
-        model_lower = model.lower()
+    if "/" in model:
+        return model  # already has provider prefix
 
-        # Claude models need anthropic/ prefix
-        if 'claude' in model_lower:
-            return f"anthropic/{model}"
-
-        # GPT models need openai/ prefix (if someone wants to use them via OpenRouter)
-        if model_lower.startswith('gpt-') or model_lower.startswith('o1') or model_lower.startswith('o3'):
-            return f"openai/{model}"
-
-        # For other models, return as-is and let OpenRouter handle it
-        return model
-
+    lower = model.lower()
+    if lower.startswith("gpt-") or lower.startswith("o1") or lower.startswith("o3"):
+        return f"openai/{model}"
+    if "claude" in lower:
+        return f"anthropic/{model}"
     return model
 
 
 def create_llm_clients(
     model: str,
-    openai_api_key: str,
-    openrouter_api_key: str,
+    openrouter_api_key: str = None,
+    openai_api_key: str = None,
     temperature: float = 1.0,
-    max_workers: int = 20
-) -> Tuple[object, object, bool]:
+    max_workers: int = 20,
+) -> Tuple[object, object]:
     """
-    Create appropriate LLM clients based on model name.
+    Create LLM client and matching parallel client, routing to appropriate provider.
 
-    Automatically determines whether to use OpenAI or OpenRouter based on model name.
+    Routes to:
+    - OpenAI API for GPT models (gpt-*, o1*, o3*)
+    - OpenRouter API for all other models (Claude, Llama, etc.)
 
     Args:
-        model: Model identifier (e.g., "gpt-4o", "claude-3.5-sonnet")
-        openai_api_key: OpenAI API key
-        openrouter_api_key: OpenRouter API key
-        temperature: Temperature for generation
-        max_workers: Max parallel workers for batch requests
+        model:              Model identifier (normalised automatically).
+        openrouter_api_key: OpenRouter API key (required for non-OpenAI models).
+        openai_api_key:     OpenAI API key (required for OpenAI models).
+        temperature:        Sampling temperature.
+        max_workers:        Max concurrent requests for the parallel client.
 
     Returns:
-        Tuple of (llm_client, parallel_client, used_openai: bool)
-
-    Examples:
-        >>> client, parallel, is_openai = create_llm_clients("gpt-4o", key1, key2)
-        # Uses OpenAI API
-
-        >>> client, parallel, is_openai = create_llm_clients("claude-3.5-sonnet", key1, key2)
-        # Uses OpenRouter API with anthropic/claude-3.5-sonnet
+        (llm_client, parallel_client)
     """
-    use_openai = should_use_openai(model)
-    normalized_model = normalize_model_name(model, use_openai)
+    normalised = normalize_model_name(model)
 
-    if use_openai:
-        print(f"🔵 Using OpenAI API with model: {normalized_model}")
+    # Determine if this is an OpenAI model
+    if is_openai_model(model):
+        # Route to OpenAI API
+        if not openai_api_key:
+            raise ValueError(
+                f"Model '{model}' requires OPENAI_API_KEY but it's not set. "
+                "Please add OPENAI_API_KEY to your .env file."
+            )
+
+        # Extract base model name (remove openai/ prefix if present)
+        base_model = normalised.split("/")[-1]
+
+        print(f"Using OpenAI API with model: {base_model}")
         llm_client = OpenAIClient(
             api_key=openai_api_key,
-            model=normalized_model,
-            temperature=temperature
+            model=base_model,
+            temperature=temperature,
+            timeout=120,
         )
-        parallel_client = ParallelLLMClient(
-            api_key=openai_api_key,
-            max_workers=max_workers
-        )
-    else:
-        print(f"🟣 Using OpenRouter API with model: {normalized_model}")
-        # Use longer timeout for reasoning models (Qwen, DeepSeek R1, etc.)
-        is_reasoning_model = ('qwen' in normalized_model.lower() or
-                             'deepseek-r1' in normalized_model.lower() or
-                             'r1' in normalized_model.lower())
-        timeout = 300 if is_reasoning_model else 120
+        # Note: Parallel client not used for OpenAI in current implementation
+        # Will be handled by queued client in trial_runner.py
+        parallel_client = None
+        return llm_client, parallel_client
 
+    else:
+        # Route to OpenRouter API
+        if not openrouter_api_key:
+            raise ValueError(
+                f"Model '{model}' requires OPENROUTER_API_KEY but it's not set. "
+                "Please add OPENROUTER_API_KEY to your .env file."
+            )
+
+        is_reasoning = (
+            "qwen" in normalised.lower()
+            or "deepseek-r1" in normalised.lower()
+            or "/r1" in normalised.lower()
+        )
+        timeout = 300 if is_reasoning else 120
+
+        print(f"Using OpenRouter with model: {normalised}")
         llm_client = OpenRouterClient(
             api_key=openrouter_api_key,
-            model=normalized_model,
+            model=normalised,
             temperature=temperature,
-            timeout=timeout
+            timeout=timeout,
         )
         parallel_client = AsyncOpenRouterParallelClient(
             api_key=openrouter_api_key,
-            max_concurrent=max_workers,  # Use max_concurrent instead of max_workers
-            timeout=timeout
+            max_concurrent=max_workers,
+            timeout=timeout,
         )
-
-    return llm_client, parallel_client, use_openai
+        return llm_client, parallel_client

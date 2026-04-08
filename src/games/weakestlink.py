@@ -103,12 +103,15 @@ class WeakestLinkGame(GameDefinition):
         if not actions:
             return {}
 
+        # Convert all actions to integers (defensive - they should already be ints)
+        int_actions = {name: int(effort) for name, effort in actions.items()}
+
         # Find minimum effort across all players
-        min_effort = min(actions.values())
+        min_effort = min(int_actions.values())
 
         # Assign payouts
         payouts = {}
-        for agent_name, my_effort in actions.items():
+        for agent_name, my_effort in int_actions.items():
             # Payoff = benefit × min_effort - cost × my_effort
             payouts[agent_name] = self.benefit_per_min_effort * min_effort - self.cost_per_effort * my_effort
 
@@ -119,13 +122,16 @@ class WeakestLinkGame(GameDefinition):
         if not actions:
             return {}
 
+        # Convert all actions to integers (defensive - they should already be ints)
+        int_actions = {name: int(effort) for name, effort in actions.items()}
+
         # Find minimum effort
-        min_effort = min(actions.values())
-        max_effort = max(actions.values())
-        avg_effort = sum(actions.values()) / len(actions)
+        min_effort = min(int_actions.values())
+        max_effort = max(int_actions.values())
+        avg_effort = sum(int_actions.values()) / len(int_actions)
 
         # Identify who is the weakest link
-        weakest_links = [name for name, effort in actions.items() if effort == min_effort]
+        weakest_links = [name for name, effort in int_actions.items() if effort == min_effort]
 
         # Determine outcome description
         if min_effort == max_effort:
@@ -136,14 +142,14 @@ class WeakestLinkGame(GameDefinition):
             outcome_description = f"{len(weakest_links)} players tied as weakest link with effort {min_effort}"
 
         return {
-            "choices": actions,
+            "choices": int_actions,
             "min_effort": min_effort,
             "max_effort": max_effort,
             "avg_effort": round(avg_effort, 2),
             "weakest_links": weakest_links,
             "outcome": outcome_description,
             # Wasted effort
-            "total_wasted_effort": sum(max(0, effort - min_effort) for effort in actions.values()),
+            "total_wasted_effort": sum(max(0, effort - min_effort) for effort in int_actions.values()),
             # Parameters for reference
             "cost_per_effort": self.cost_per_effort,
             "benefit_per_min_effort": self.benefit_per_min_effort

@@ -10,19 +10,15 @@ load_dotenv()
 # API CONFIGURATION - Loaded from .env file
 # ============================================================================
 
-# OpenAI Configuration
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+# Model / temperature defaults (used when no explicit model is passed)
 MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 TEMPERATURE = float(os.getenv('TEMPERATURE', '1.0'))
 
-# OpenRouter Configuration
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
+# OpenAI Configuration (for GPT models: gpt-*, o1*, o3*)
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 
-# API Routing (AUTOMATIC - no need to manually change)
-# The system automatically routes models to the correct API:
-# - GPT models (gpt-*, o1*, o3*) → OpenAI API
-# - Claude models (claude-*, anthropic/*) → OpenRouter API
-# - Other models (Gemini, Llama, etc.) → OpenRouter API
+# OpenRouter Configuration (for non-OpenAI models: Claude, Llama, etc.)
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
 
 # Reasoning Model Configuration (for o1/o3/gpt-5 models)
 # Valid values: "low", "medium", "high"
@@ -39,14 +35,8 @@ NUM_AGENTS = int(os.getenv('NUM_AGENTS', '5'))
 # VALIDATION
 # ============================================================================
 
-if not OPENAI_API_KEY:
+if not OPENAI_API_KEY and not OPENROUTER_API_KEY:
     raise ValueError(
-        "OPENAI_API_KEY not set. "
-        "Please create a .env file with your API keys (see .env.example)"
-    )
-
-if not OPENROUTER_API_KEY:
-    raise ValueError(
-        "OPENROUTER_API_KEY not set. "
-        "Please create a .env file with your API keys (see .env.example)"
+        "Neither OPENAI_API_KEY nor OPENROUTER_API_KEY is set. "
+        "Please create a .env file with at least one API key (see .env.example)"
     )
