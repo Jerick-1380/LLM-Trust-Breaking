@@ -1,9 +1,3 @@
-# LLM Strategic Deception
-
-**Testing strategic deception and trust evolution in LLM agents through multi-round game-theoretic interactions.**
-
----
-
 ## Overview
 
 This research framework measures how large language models engage in **strategic deception** (promise-breaking) and how **trust evolves** when models repeatedly deceive each other across 10 rounds of strategic games.
