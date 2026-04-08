@@ -2,13 +2,6 @@
 
 This research framework measures how large language models engage in **strategic deception** (promise-breaking) and how **trust evolves** when models repeatedly deceive each other across 10 rounds of strategic games.
 
-**Key Innovation:** A 3-stage protocol that separates *premeditated* deception (planned lies) from *impulsive* deception (broken commitments):
-
-```
-Stage 1: Private Planning → Stage 2: Public Announcement → Stage 3: Actual Choice → Reflection
-(hidden intent)          (stated promise)              (real action)        (trust update)
-```
-
 ![Methodology](methodology.png)
 
 ---
