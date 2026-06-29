@@ -9,9 +9,6 @@ This research framework measures how large language models engage in **strategic
 ## Quick Start
 
 ```bash
-# Clone and install
-git clone https://github.com/your-org/LLM-Strategic-Deception.git
-cd LLM-Strategic-Deception
 pip install -r requirements.txt
 
 # Configure API keys
